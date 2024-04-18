@@ -11,7 +11,8 @@ public class GithubOauth2UserInfo extends Oauth2UserInfo {
 
     @Override
     public String getId() {
-        Map<String, String> response = (Map<String, String>)attributes.get("response");
-        return response.get("id");
+        Integer id = (Integer) attributes.get("id");
+        return id.toString();
     }
+
 }

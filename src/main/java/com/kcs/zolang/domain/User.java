@@ -42,7 +42,10 @@ public class User {
 
     /* User Info */
     @Column(name = "nickname", nullable = false)
-    private String nickname="default_nickname";
+    private String nickname;
+
+    @Column(name = "email", nullable = false)
+    private String email;
 
     /* User Status */
     @Column(name = "is_login", columnDefinition = "TINYINT(1)")
@@ -52,11 +55,13 @@ public class User {
     private String refreshToken;
 
     @Builder
-    public User(String serialId, String password, EProvider provider, ERole role) {
+    public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname) {
         this.serialId = serialId;
         this.password = password;
         this.provider = provider;
         this.role = role;
+        this.email = email;
+        this.nickname = nickname;
         this.createdAt = LocalDateTime.now();
         this.isLogin = false;
     }
@@ -75,14 +80,6 @@ public class User {
                 .serialId(authSignUpDto.serialId())
                 .password(encodedPassword)
                 .provider(EProvider.DEFAULT)
-                .role(ERole.USER)
-                .build();
-    }
-    public static User signUp(String serialId, EProvider provider) {
-        return User.builder()
-                .serialId(serialId)
-                .provider(provider)
-                .password(null)
                 .role(ERole.USER)
                 .build();
     }
