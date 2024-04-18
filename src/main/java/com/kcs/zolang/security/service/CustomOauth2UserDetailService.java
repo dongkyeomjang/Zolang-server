@@ -43,6 +43,8 @@ public class CustomOauth2UserDetailService extends DefaultOAuth2UserService {
                                             .password(bCryptPasswordEncoder.encode(UUID.randomUUID().toString()))
                                             .provider(provider)
                                             .role(ERole.GUEST)
+                                            .nickname(oauth2UserInfo.getAttributes().get("login").toString())
+                                            .email(oauth2UserInfo.getAttributes().get("email").toString())
                                             .build()
                             );
                             return UserRepository.UserSecurityForm.invoke(newUser);
