@@ -32,21 +32,26 @@ public class Cluster {
     @Column(name = "domain_url", nullable = false)
     private String domainUrl;
 
+    @Column(name = "version", nullable = false)
+    private String version;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Cluster(User user, String clusterName, String secretToken, String domainUrl) {
+    public Cluster(User user, String clusterName, String secretToken, String domainUrl, String version) {
         this.user = user;
         this.clusterName = clusterName;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
+        this.version = version;
         this.createdAt = LocalDateTime.now();
     }
-    public void update(String clusterName, String secretToken, String domainUrl) {
+    public void update(String clusterName, String secretToken, String domainUrl, String version) {
         this.clusterName = clusterName;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
+        this.version = version;
     }
 }
