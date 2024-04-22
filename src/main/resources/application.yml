@@ -1,14 +1,14 @@
+spring:
+  profiles:
+    active: local
+    include:
+      - local
+
 
 ---
 
 spring:
   profiles:
-    active: local
-
----
-
-#spring:
-#  profiles:
-#    active: dev
+    active: dev
 
 ---

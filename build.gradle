@@ -59,6 +59,9 @@ dependencies {
 
     // lang3
     implementation 'org.apache.commons:commons-lang3:3.12.0'
+
+    // Kubernetes
+    implementation 'io.kubernetes:client-java:20.0.1'
 }
 
 tasks.named('test') {
