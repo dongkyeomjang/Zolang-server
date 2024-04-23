@@ -26,7 +26,7 @@ public class Cluster {
     @Column(name = "cluster_name", nullable = false)
     private String clusterName;
 
-    @Column(name = "secret_token", nullable = false)
+    @Column(name = "secret_token", nullable = false, columnDefinition = "TEXT")
     private String secretToken;
 
     @Column(name = "domain_url", nullable = false)
