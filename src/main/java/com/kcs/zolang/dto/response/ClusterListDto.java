@@ -4,7 +4,6 @@ import com.kcs.zolang.domain.Cluster;
 import lombok.Builder;
 import lombok.Getter;
 
-@Getter
 @Builder
 public record ClusterListDto(
         String clusterName,
