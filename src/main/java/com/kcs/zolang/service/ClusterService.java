@@ -2,7 +2,10 @@ package com.kcs.zolang.service;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.dto.response.ClusterListDto;
+import com.kcs.zolang.exception.CommonException;
+import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
+import com.kcs.zolang.utility.ClusterApiUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +15,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class ClusterService {
     private final ClusterRepository clusterRepository;
+    private final ClusterApiUtil clusterApiUtil;
 
     public List<ClusterListDto> getClusterList(Long userId) {
         return clusterRepository.findByUserId(userId).stream() // 사용자가 웹서비스에 등록해놓은 클러스터 리스트 가져와서
@@ -20,7 +24,9 @@ public class ClusterService {
     }
 
     public Boolean getClusterStatus(Long clusterId) {
-        // 클러스터의 상태를 가져오는 로직
-        return true;
+        // 클러스터의 상태를 가져오는 메소드. 클러스터의 상태는 DB에 저장되어있지 않고, 실시간으로 가져와야함.
+        Cluster cluster = clusterRepository.findById(clusterId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+        return clusterApiUtil.getClusterStatus(cluster.getDomainUrl(), cluster.getSecretToken());
     }
 }
