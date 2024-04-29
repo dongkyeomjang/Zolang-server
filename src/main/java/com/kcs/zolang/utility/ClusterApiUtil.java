@@ -34,64 +34,64 @@ import java.util.Map;
 @Component
 @RequiredArgsConstructor
 public class ClusterApiUtil {
-    // private final SSLConfig sslConfigurator;
+    private final SSLConfig sslConfigurator;
 
-    // public RestTemplate createRestTemplateForCluster(Cluster cluster) throws Exception {
-    //     SSLContext sslContext = createSSLContext(cluster.getCertPath());
-    //     CloseableHttpClient httpClient = HttpClients.custom()
-    //             .setConnectionManager(
-    //                     PoolingHttpClientConnectionManagerBuilder.create()
-    //                             .setSSLSocketFactory(
-    //                                     SSLConnectionSocketFactoryBuilder.create()
-    //                                             .setSslContext(sslContext)
-    //                                             .build())
-    //                             .build())
-    //             .build();
-    //     HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
-    //     return new RestTemplate(requestFactory);
-    // }
+    public RestTemplate createRestTemplateForCluster(Cluster cluster) throws Exception {
+        SSLContext sslContext = createSSLContext(cluster.getCertPath());
+        CloseableHttpClient httpClient = HttpClients.custom()
+                .setConnectionManager(
+                        PoolingHttpClientConnectionManagerBuilder.create()
+                                .setSSLSocketFactory(
+                                        SSLConnectionSocketFactoryBuilder.create()
+                                                .setSslContext(sslContext)
+                                                .build())
+                                .build())
+                .build();
+        HttpComponentsClientHttpRequestFactory requestFactory = new HttpComponentsClientHttpRequestFactory(httpClient);
+        return new RestTemplate(requestFactory);
+    }
 
-    // public Cluster registerNewCluster(User user, RegisterClusterDto clusterDto, InputStream certificateStream, String filename) throws Exception {
-    //     String certPath = sslConfigurator.storeCertificate(certificateStream, filename, user.getId(), clusterDto.clusterName());
-    //     return Cluster.builder()
-    //             .clusterName(clusterDto.clusterName())
-    //             .domainUrl(clusterDto.domainUrl())
-    //             .secretToken(clusterDto.secretToken())
-    //             .user(user)
-    //             .version(clusterDto.version())
-    //             .certPath(certPath)
-    //             .build();
-    // }
-    // public SSLContext createSSLContext(String certPath) throws Exception {
-    //     try {
-    //         log.info("Certificate file path : {}", certPath);
+    public Cluster registerNewCluster(User user, RegisterClusterDto clusterDto, InputStream certificateStream, String filename) throws Exception {
+        String certPath = sslConfigurator.storeCertificate(certificateStream, filename, user.getId(), clusterDto.clusterName());
+        return Cluster.builder()
+                .clusterName(clusterDto.clusterName())
+                .domainUrl(clusterDto.domainUrl())
+                .secretToken(clusterDto.secretToken())
+                .user(user)
+                .version(clusterDto.version())
+                .certPath(certPath)
+                .build();
+    }
+    public SSLContext createSSLContext(String certPath) throws Exception {
+        try {
+            log.info("Certificate file path : {}", certPath);
 
-    //         // PEM 형식의 파일을 읽기
-    //         FileReader fileReader = new FileReader(certPath);
-    //         PemReader pemReader = new PemReader(fileReader);
-    //         ByteArrayInputStream inputStream = new ByteArrayInputStream(pemReader.readPemObject().getContent());
+            // PEM 형식의 파일을 읽기
+            FileReader fileReader = new FileReader(certPath);
+            PemReader pemReader = new PemReader(fileReader);
+            ByteArrayInputStream inputStream = new ByteArrayInputStream(pemReader.readPemObject().getContent());
 
-    //         // CertificateFactory를 사용하여 X.509 형식의 인증서 생성
-    //         CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
-    //         X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
-    //         pemReader.close();
+            // CertificateFactory를 사용하여 X.509 형식의 인증서 생성
+            CertificateFactory certificateFactory = CertificateFactory.getInstance("X.509");
+            X509Certificate certificate = (X509Certificate) certificateFactory.generateCertificate(inputStream);
+            pemReader.close();
 
-    //         // KeyStore에 인증서 추가
-    //         KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
-    //         keyStore.load(null, null);
-    //         keyStore.setCertificateEntry("certificate", certificate);
+            // KeyStore에 인증서 추가
+            KeyStore keyStore = KeyStore.getInstance(KeyStore.getDefaultType());
+            keyStore.load(null, null);
+            keyStore.setCertificateEntry("certificate", certificate);
 
-    //         TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
-    //         tmf.init(keyStore);
+            TrustManagerFactory tmf = TrustManagerFactory.getInstance(TrustManagerFactory.getDefaultAlgorithm());
+            tmf.init(keyStore);
 
-    //         SSLContext sslContext = SSLContext.getInstance("TLS");
-    //         sslContext.init(null, tmf.getTrustManagers(), new SecureRandom());
-    //         return sslContext;
-    //     } catch (Exception e) {
-    //         log.error("Failed to load certificate file", e);
-    //         throw e;
-    //     }
-    // }
+            SSLContext sslContext = SSLContext.getInstance("TLS");
+            sslContext.init(null, tmf.getTrustManagers(), new SecureRandom());
+            return sslContext;
+        } catch (Exception e) {
+            log.error("Failed to load certificate file", e);
+            throw e;
+        }
+    }
 
     public boolean getClusterStatus(String url, String token, RestTemplate restTemplate) {
         HttpHeaders headers = new HttpHeaders();
