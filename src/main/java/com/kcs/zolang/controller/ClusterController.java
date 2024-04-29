@@ -18,18 +18,18 @@ import org.springframework.web.multipart.MultipartFile;
 public class ClusterController {
     private final ClusterService clusterService;
 
-    // @PostMapping(value = "", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE,MediaType.APPLICATION_JSON_VALUE})
-    // @Operation(summary = "클러스터 등록", description = "사용자의 클러스터를 등록")
-    // public ResponseDto<?> registerCluster(
-    //         @UserId Long userId,
-    //         @RequestPart(value = "file")
-    //         @Valid MultipartFile file,
-    //         @RequestPart(value = "message")
-    //         @Valid RegisterClusterDto registerClusterDto
+    @PostMapping(value = "", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE,MediaType.APPLICATION_JSON_VALUE})
+    @Operation(summary = "클러스터 등록", description = "사용자의 클러스터를 등록")
+    public ResponseDto<?> registerCluster(
+            @UserId Long userId,
+            @RequestPart(value = "file")
+            @Valid MultipartFile file,
+            @RequestPart(value = "message")
+            @Valid RegisterClusterDto registerClusterDto
 
-    //         ){
-    //     return ResponseDto.created(clusterService.registerCluster(userId, file, registerClusterDto));
-    // }
+            ){
+        return ResponseDto.created(clusterService.registerCluster(userId, file, registerClusterDto));
+    }
     @GetMapping("")
     @Operation(summary = "클러스터 목록 조회", description = "사용자의 클러스터 목록을 조회. 단, DB에 있는 값만 들고옴. 상태조회 API 별도 존재")
     public ResponseDto<?> getClusters(
