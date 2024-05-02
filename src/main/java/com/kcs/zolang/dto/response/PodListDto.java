@@ -7,14 +7,10 @@ import lombok.Builder;
 
 @Builder
 public record PodListDto(
-    String apiVersion,
-    String kind,
     List<PodDto> items
 ) implements Serializable {
     public static PodListDto of(V1PodList podList) {
         return PodListDto.builder()
-            .apiVersion(podList.getApiVersion())
-            .kind(podList.getKind())
             .items(podList.getItems().stream().map(PodDto::fromEntity).toList())
             .build();
     }

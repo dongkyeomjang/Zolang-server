@@ -2,14 +2,13 @@ package com.kcs.zolang.controller;
 
 import com.kcs.zolang.annotation.UserId;
 import com.kcs.zolang.dto.global.ResponseDto;
-import com.kcs.zolang.dto.response.PodListDto;
+import com.kcs.zolang.dto.response.PodDto;
 import com.kcs.zolang.dto.response.UserUrlTokenDto;
 import com.kcs.zolang.service.WorkloadService;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.util.Config;
 import java.util.List;
@@ -25,14 +24,14 @@ public class WorkloadController {
     private final WorkloadService podService;
 
     @GetMapping
-    public ResponseDto<PodListDto> getOverview(
+    public ResponseDto getOverview(
         @UserId Long userId
     ) {
-        return ResponseDto.ok(podService.getWorkload(userId));
+        return ResponseDto.noContent();
     }
 
     @GetMapping("/pods")
-    public ResponseDto<PodListDto> getPods(
+    public ResponseDto<List<PodDto>> getPods(
         @UserId Long userId
     ) {
         return ResponseDto.ok(podService.getPodList(userId));
