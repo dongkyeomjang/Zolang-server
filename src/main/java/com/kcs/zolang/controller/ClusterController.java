@@ -11,6 +11,9 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+
+import java.io.IOException;
+
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/cluster")
@@ -27,7 +30,7 @@ public class ClusterController {
             @RequestPart(value = "message")
             @Valid RegisterClusterDto registerClusterDto
 
-            ){
+            ) throws IOException {
         return ResponseDto.created(clusterService.registerCluster(userId, file, registerClusterDto));
     }
     @GetMapping("")
