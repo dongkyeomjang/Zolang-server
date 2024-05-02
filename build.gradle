@@ -60,6 +60,11 @@ dependencies {
     // lang3
     implementation 'org.apache.commons:commons-lang3:3.12.0'
 
+    implementation 'org.apache.httpcomponents.client5:httpclient5:5.3.1'
+    implementation 'org.apache.httpcomponents.core5:httpcore5:5.2.4'
+
+    implementation 'org.bouncycastle:bcprov-jdk18on:1.75'
+
     // Kubernetes
     implementation 'io.kubernetes:client-java:20.0.1'
 }

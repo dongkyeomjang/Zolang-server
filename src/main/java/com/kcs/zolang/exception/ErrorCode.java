@@ -16,6 +16,7 @@ public enum ErrorCode {
     NOT_FOUND_LOGIN_USER(40401, HttpStatus.NOT_FOUND, "로그인한 사용자가 존재하지 않습니다."),
     NOT_FOUND_AUTHORIZATION_HEADER(40401, HttpStatus.NOT_FOUND, "Authorization 헤더가 존재하지 않습니다."),
     NOT_FOUND_USER(40401, HttpStatus.NOT_FOUND, "해당 사용자가 존재하지 않습니다."),
+    NOT_FOUND_CLUSTER(40402, HttpStatus.NOT_FOUND, "해당 클러스터가 존재하지 않습니다."),
 
     // Invalid Argument Error
     MISSING_REQUEST_PARAMETER(40000, HttpStatus.BAD_REQUEST, "필수 요청 파라미터가 누락되었습니다."),
@@ -48,7 +49,9 @@ public enum ErrorCode {
     // Internal Server Error
     INTERNAL_SERVER_ERROR(50000, HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     UPLOAD_FILE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패하였습니다."),
-    API_ERROR(50002, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다.");
+    FILE_STORAGE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패하였습니다."),
+    CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
+    API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;

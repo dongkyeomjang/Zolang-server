@@ -26,27 +26,36 @@ public class Cluster {
     @Column(name = "cluster_name", nullable = false)
     private String clusterName;
 
-    @Column(name = "secret_token", nullable = false)
+    @Column(name = "secret_token", nullable = false, columnDefinition = "TEXT")
     private String secretToken;
 
     @Column(name = "domain_url", nullable = false)
     private String domainUrl;
+
+    @Column(name = "version", nullable = false)
+    private String version;
+
+    @Column(name = "cert_path", nullable = true)
+    private String certPath;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Cluster(User user, String clusterName, String secretToken, String domainUrl) {
+    public Cluster(User user, String clusterName, String secretToken, String domainUrl, String version, String certPath) {
         this.user = user;
         this.clusterName = clusterName;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
+        this.version = version;
+        this.certPath = certPath;
         this.createdAt = LocalDateTime.now();
     }
-    public void update(String clusterName, String secretToken, String domainUrl) {
+    public void update(String clusterName, String secretToken, String domainUrl, String version) {
         this.clusterName = clusterName;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
+        this.version = version;
     }
 }
