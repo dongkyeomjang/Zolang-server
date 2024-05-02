@@ -10,6 +10,7 @@ import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
 import com.kcs.zolang.utility.ClusterApiUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
@@ -31,13 +32,15 @@ public class ClusterService {
     private final ClusterRepository clusterRepository;
     private final ClusterApiUtil clusterApiUtil;
     private final UserRepository userRepository;
+    @Value("${certification.path}")
+    private String basePath;
 
     public Long registerCluster(Long userId, MultipartFile file, RegisterClusterDto registerClusterDto) throws IOException {
         InputStream certificateStream = file.getInputStream();
         String filename = file.getOriginalFilename();
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
-        Path certPath = Path.of("/Users/kyeom/Development/resources/cert-zolang/", userId.toString()+registerClusterDto.clusterName()+filename);
+        Path certPath = Path.of(basePath, userId.toString()+registerClusterDto.clusterName()+filename);
         Files.copy(certificateStream, certPath, StandardCopyOption.REPLACE_EXISTING);
         return clusterRepository.save(
                 Cluster.builder()
