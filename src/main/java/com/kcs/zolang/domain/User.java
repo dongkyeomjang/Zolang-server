@@ -47,9 +47,6 @@ public class User {
     @Column(name = "email", nullable = true)
     private String email;
 
-    @Column(name = "domain_url", nullable = false)
-    private String domainUrl;
-
     /* User Status */
     @Column(name = "is_login", columnDefinition = "TINYINT(1)")
     private Boolean isLogin;
@@ -58,14 +55,13 @@ public class User {
     private String refreshToken;
 
     @Builder
-    public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname, String domainUrl) {
+    public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname) {
         this.serialId = serialId;
         this.password = password;
         this.provider = provider;
         this.role = role;
         this.email = email;
         this.nickname = nickname;
-        this.domainUrl = domainUrl;
         this.createdAt = LocalDateTime.now();
         this.isLogin = false;
     }
