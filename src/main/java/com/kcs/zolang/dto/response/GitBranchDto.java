@@ -1,2 +1,12 @@
-package com.kcs.zolang.dto.response;public class GitBranchDto {
+package com.kcs.zolang.dto.response;
+
+import lombok.Builder;
+
+@Builder
+public record GitBranchDto(
+        String name,
+        String commitsUrl,
+        String commitSha,
+        String isProtected
+) {
 }
