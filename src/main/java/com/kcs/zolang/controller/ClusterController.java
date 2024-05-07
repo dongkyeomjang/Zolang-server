@@ -54,4 +54,13 @@ public class ClusterController {
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodes(clusterId));
     }
+
+    @GetMapping("/{cluster_id}/nodes/{node_name}")
+    @Operation(summary = "클러스터 노드 상세 조회", description = "등록된 클러스터의 노드 상세 정보를 조회")
+    public ResponseDto<?> getClusterNode(
+            @PathVariable("cluster_id") Long clusterId,
+            @PathVariable("node_name") String nodeName
+    ) throws Exception {
+        return ResponseDto.ok(clusterService.getClusterNodeDetail(clusterId, nodeName));
+    }
 }

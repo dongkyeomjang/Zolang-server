@@ -116,20 +116,29 @@ public class ClusterService {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
                 for (Map<String, Object> item : items) {
                     Map<String, Object> nodeDetails = new HashMap<>();  // 각 노드의 상세 정보를 저장할 Map 생성
+                    Map<String, Object> allocatableList = new HashMap<>();
+                    Map<String, Object> capacityList = new HashMap<>();
                     Map<String, Object> metadata = (Map<String, Object>) item.get("metadata");
                     Map<String, Object> status = (Map<String, Object>) item.get("status");
                     Map<String, Object> nodeInfo = (Map<String, Object>) status.get("nodeInfo");
-
+                    Map<String, Object> allocatable = (Map<String, Object>) status.get("allocatable");
+                    Map<String, Object> capacity = (Map<String, Object>) status.get("capacity");
+                    List<Map<String, Object>> conditions = ((List<Map<String, Object>>) status.get("conditions"));
+                    Map<String, Object> conditionReady = conditions.stream()
+                                    .filter(condition -> "Ready".equals(condition.get("type")))
+                                    .findFirst()
+                                            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CONDITION));
+                    allocatableList.put("allocatable-cpu", allocatable.get("cpu"));
+                    allocatableList.put("allocatable-memory", allocatable.get("memory"));
+                    allocatableList.put("allocatable-pods", allocatable.get("pods"));
+                    nodeDetails.put("allocatable", allocatableList);
+                    capacityList.put("capacity-cpu", capacity.get("cpu"));
+                    capacityList.put("capacity-memory", capacity.get("memory"));
+                    capacityList.put("capacity-pods", capacity.get("pods"));
+                    nodeDetails.put("capacity", capacityList);
                     nodeDetails.put("created", metadata.get("creationTimestamp"));
                     nodeDetails.put("name", metadata.get("name"));
-                    nodeDetails.put("addresses", status.get("addresses"));
-                    nodeDetails.put("capacity", status.get("capacity"));
-                    nodeDetails.put("allocatable", status.get("allocatable"));
-                    nodeDetails.put("conditions", status.get("conditions"));
-                    nodeDetails.put("OS", nodeInfo.get("operatingSystem"));
-                    nodeDetails.put("OSImage", nodeInfo.get("osImage"));
-                    nodeDetails.put("kernelVersion", nodeInfo.get("kernelVersion"));
-                    nodeDetails.put("containerRuntime", nodeInfo.get("containerRuntimeVersion"));
+                    nodeDetails.put("ready", conditionReady.get("status"));
                     nodeDetails.put("KubeletVersion", nodeInfo.get("kubeletVersion"));
 
                     result.add(nodeDetails);  // 개별 노드의 상세 정보를 결과 리스트에 추가
@@ -138,5 +147,46 @@ public class ClusterService {
             return result;  // 모든 노드의 상세 정보가 담긴 리스트 반환
         }
         return List.of();
+    }
+
+    public Map<String,Object> getClusterNodeDetail(Long clusterId, String nodeName) throws Exception {
+        // 특정 클러스터의 노드 상세 정보를 가져오는 메소드.
+        Cluster cluster = clusterRepository.findById(clusterId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+        RestTemplate restTemplate = clusterApiUtil.createRestTemplate(cluster);
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "Bearer " + cluster.getSecretToken());
+        headers.setContentType(MediaType.APPLICATION_JSON);
+
+        UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(cluster.getDomainUrl())
+                .path("/api/v1/nodes/" + nodeName);
+
+        HttpEntity<String> entity = new HttpEntity<>(headers);
+        ResponseEntity<Map> response = restTemplate.exchange(
+                builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
+
+        if (response.getStatusCode() == HttpStatus.OK && response.hasBody()) {
+            Map<String, Object> body = response.getBody();
+            if (body != null && body.containsKey("metadata")) {
+                Map<String, Object> nodeDetails = new HashMap<>();  // 각 노드의 상세 정보를 저장할 Map 생성
+                Map<String, Object> metadata = (Map<String, Object>) body.get("metadata");
+                Map<String, Object> status = (Map<String, Object>) body.get("status");
+                Map<String, Object> nodeInfo = (Map<String, Object>) status.get("nodeInfo");
+
+                nodeDetails.put("created", metadata.get("creationTimestamp"));
+                nodeDetails.put("name", metadata.get("name"));
+                nodeDetails.put("addresses", status.get("addresses"));
+                nodeDetails.put("capacity", status.get("capacity"));
+                nodeDetails.put("allocatable", status.get("allocatable"));
+                nodeDetails.put("conditions", status.get("conditions"));
+                nodeDetails.put("OS", nodeInfo.get("operatingSystem"));
+                nodeDetails.put("OSImage", nodeInfo.get("osImage"));
+                nodeDetails.put("kernelVersion", nodeInfo.get("kernelVersion"));
+                nodeDetails.put("containerRuntime", nodeInfo.get("containerRuntimeVersion"));
+                nodeDetails.put("KubeletVersion", nodeInfo.get("kubeletVersion"));
+                return nodeDetails;
+            }
+        }
+        return Map.of();
     }
 }
