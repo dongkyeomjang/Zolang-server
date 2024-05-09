@@ -1,6 +1,6 @@
 package com.kcs.zolang.dto.response;
 
-import static com.kcs.zolang.service.WorkloadService.getAge;
+import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1ContainerStatus;
@@ -8,6 +8,7 @@ import io.kubernetes.client.openapi.models.V1Pod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.Builder;
 
 @Builder
@@ -39,7 +40,8 @@ public record PodSimpleDto(
             .restartCount(pod.getStatus().getContainerStatuses().stream()
                 .map(V1ContainerStatus::getRestartCount).toList())
             .node(pod.getSpec().getNodeName())
-            .age(getAge(pod.getMetadata().getCreationTimestamp().toLocalDateTime()))
+            .age(getAge(
+                Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
             .build();
     }
