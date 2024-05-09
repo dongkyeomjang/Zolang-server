@@ -30,6 +30,6 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
 
         AuthenticationResponse.makeLoginSuccessResponse(response, jwtTokenDto, jwtUtil.getRefreshExpiration());
 
-        response.sendRedirect("http://localhost:3000");
+        response.sendRedirect("http://localhost:5173/dashboard");
     }
 }
