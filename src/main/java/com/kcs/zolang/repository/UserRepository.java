@@ -26,8 +26,8 @@ public interface UserRepository extends JpaRepository<User, Long> {
     Optional<UserSecurityForm> findSecurityFormById(@Param("id") Long id);
 
     @Modifying(clearAutomatically = true)
-    @Query("update User u set u.refreshToken = :refreshToken, u.isLogin = :isLogin where u.id = :id")
-    void updateRefreshTokenAndLoginStatus(@Param("id") Long id, @Param("refreshToken") String refreshToken, @Param("isLogin") Boolean isLogin);
+    @Query("update User u set u.refreshToken = :refreshToken, u.isLogin = :isLogin, u.githubAccessToken = :githubAccessToken where u.id = :id")
+    void updateRefreshTokenAndLoginStatusAndGithubAccessToken(@Param("id") Long id, @Param("refreshToken") String refreshToken, @Param("isLogin") Boolean isLogin, @Param("githubAccessToken") String githubAccessToken);
 
     boolean existsByNickname(String nickname);
 
@@ -35,6 +35,7 @@ public interface UserRepository extends JpaRepository<User, Long> {
         Long getId();
         ERole getRole();
         String getPassword();
+        String getGithubAccessToken();
         static UserSecurityForm invoke(User user) {
             return new UserSecurityForm() {
                 @Override
@@ -50,6 +51,11 @@ public interface UserRepository extends JpaRepository<User, Long> {
                 @Override
                 public String getPassword() {
                     return user.getPassword();
+                }
+
+                @Override
+                public String getGithubAccessToken() {
+                    return user.getGithubAccessToken();
                 }
             };
         }

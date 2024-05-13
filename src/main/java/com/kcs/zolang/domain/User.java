@@ -54,6 +54,9 @@ public class User {
     @Column(name = "refresh_token")
     private String refreshToken;
 
+    @Column(name = "github_access_token")
+    private String githubAccessToken;
+
     @Builder
     public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname) {
         this.serialId = serialId;
