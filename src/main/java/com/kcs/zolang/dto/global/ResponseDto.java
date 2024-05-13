@@ -27,6 +27,10 @@ public record ResponseDto<T>(@JsonIgnore HttpStatus httpStatus,
         return new ResponseDto<>(HttpStatus.CREATED, true, data, null);
     }
 
+    public static ResponseDto<Object> noContent() {
+        return new ResponseDto<>(HttpStatus.NO_CONTENT, true, null, null);
+    }
+
     public static ResponseDto<Object> fail(final MethodArgumentNotValidException e) {
         return new ResponseDto<>(HttpStatus.BAD_REQUEST, false, null, new ArgumentNotValidExceptionDto(e));
     }

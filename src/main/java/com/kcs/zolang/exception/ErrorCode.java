@@ -51,10 +51,10 @@ public enum ErrorCode {
     INTERNAL_SERVER_ERROR(50000, HttpStatus.INTERNAL_SERVER_ERROR, "서버 내부 에러입니다."),
     UPLOAD_FILE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패하였습니다."),
     FILE_STORAGE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패하였습니다."),
-    CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다.");
+    CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
+    API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;
     private final String message;
 }
-

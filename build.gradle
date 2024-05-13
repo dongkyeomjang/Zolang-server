@@ -64,6 +64,9 @@ dependencies {
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.2.4'
 
     implementation 'org.bouncycastle:bcprov-jdk18on:1.75'
+
+    // Kubernetes java client
+    implementation 'io.kubernetes:client-java:20.0.1'
 }
 
 tasks.named('test') {
