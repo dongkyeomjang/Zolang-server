@@ -2,6 +2,7 @@ package com.kcs.zolang.dto.response;
 
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.swagger.v3.oas.annotations.media.Schema;
+import jakarta.annotation.Nullable;
 import java.util.List;
 import lombok.Builder;
 
@@ -20,6 +21,7 @@ public record PodResourceDto(
     List<Integer> restartCount,
     @Schema(description = "서비스 어카운트", example = "default")
     String serviceAccount,
+    @Nullable
     @Schema(description = "이미지 풀 시크릿", example = "default-secret")
     String imagePullSecret
 ) {
@@ -34,8 +36,8 @@ public record PodResourceDto(
                 .map(status -> status.getRestartCount()).toList())
             .serviceAccount(pod.getSpec().getServiceAccountName())
             .imagePullSecret(
-                pod.getSpec().getImagePullSecrets().stream().map(secret -> secret.getName())
-                    .findFirst().orElse(null))
+                pod.getSpec().getImagePullSecrets() != null ? pod.getSpec().getImagePullSecrets()
+                    .stream().map(secret -> secret.getName()).toString() : null)
             .build();
     }
 }

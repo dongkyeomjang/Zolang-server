@@ -8,8 +8,10 @@ import com.kcs.zolang.repository.ClusterRepository;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.util.Config;
+import java.text.DecimalFormat;
 import java.time.LocalDateTime;
-import java.util.List;
+import java.time.format.DateTimeFormatter;
+import java.time.temporal.ChronoUnit;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Component;
 
@@ -17,49 +19,61 @@ import org.springframework.stereotype.Component;
 @RequiredArgsConstructor
 public class MonitoringUtil {
 
+    public static final DateTimeFormatter DATE_TIME_FORMATTER = DateTimeFormatter.ofPattern(
+        "yyyy. MM. dd. a HH:mm:ss");
     private final ClusterRepository clusterRepository;
 
-    public static String getAge(LocalDateTime created) {
-        LocalDateTime now = LocalDateTime.now();
-        String extension;
-        int age;
-        int passedHour = now.getMinute() > created.getMinute() ? 0 : 1;
-        //1시간 이상 지난 경우 0, 아니면 1
-        int passedDay = now.getHour() - passedHour > created.getHour() ? 0 : 1;
-        //1년 이상 지난 경우 0, 아니면 1
-        int passedYear = now.getDayOfYear() - passedDay > created.getDayOfYear() ? 0 : 1;
-        age = now.getYear() - created.getYear() - passedYear;
-        if (age < 1) {
-            age = (365 + (now.getDayOfYear() - created.getDayOfYear() - passedDay)) % 365;
-            if (age < 1) {
-                age = now.getHour() - created.getHour() - passedHour;
-                if (age < 1) {
-                    age = now.getMinute() - created.getMinute();
-                    extension = "m";
-                } else {
-                    extension = "h";
-                }
-            } else {
-                extension = "d";
-            }
-        } else {
-            extension = "y";
+    public static String getAge(LocalDateTime past) {
+        if (past == null) {
+            return null;
         }
-        return age + extension;
+        LocalDateTime now = LocalDateTime.now();
+
+        long years = ChronoUnit.YEARS.between(past, now);
+        if (years > 0) {
+            return years + " year";
+        }
+
+        long months = ChronoUnit.MONTHS.between(past, now);
+        if (months > 0) {
+            return months + " month";
+        }
+
+        long days = ChronoUnit.DAYS.between(past, now);
+        if (days > 0) {
+            return days + " day";
+        }
+
+        long hours = ChronoUnit.HOURS.between(past, now);
+        if (hours > 0) {
+            return hours + " hour";
+        }
+
+        long minutes = ChronoUnit.MINUTES.between(past, now);
+        return minutes + " min";
     }
 
-    public void getV1Api(Long userId) {
-        List<Cluster> clusters = clusterRepository.findByUserId(userId);
-        if (clusters.isEmpty()) {
+    public static String byteConverter(String num) {
+        long bytes = Long.parseLong(num);
+        final String[] units = new String[]{"B", "Ki", "Mi", "Gi", "Ti"};
+        final DecimalFormat decimalFormat = new DecimalFormat("#.##");
+        if (bytes <= 0) {
+            return "0 B";
+        }
+        int digitGroups = (int) (Math.log10(bytes) / Math.log10(1024));
+        return decimalFormat.format(bytes / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
+    }
+
+    public ApiClient getV1Api(Long userId, Long clusterId) {
+        Cluster clusters = clusterRepository.findById(clusterId)
+            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+        if (clusters.getUser().getId() != userId) {
             throw new CommonException(ErrorCode.NOT_FOUND_CLUSTER);
         }
-        UserUrlTokenDto userUrlTokenDto = UserUrlTokenDto.fromEntity(clusters.get(0));
-        //false: ignore cert
+        UserUrlTokenDto userUrlTokenDto = UserUrlTokenDto.fromEntity(clusters);
         ApiClient client = Config.fromToken("https://" + userUrlTokenDto.url(),
             userUrlTokenDto.token(), false);
-        //TODO: SSL 인증서 추가
-        /*InputStream caCertInputStream = new ByteArrayInputStream(userUrlTokenDto.caCert().getBytes(StandardCharsets.UTF_8));
-        client.setSslCaCert(caCertInputStream);*/
         Configuration.setDefaultApiClient(client);
+        return client;
     }
 }

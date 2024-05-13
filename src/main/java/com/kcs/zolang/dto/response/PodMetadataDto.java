@@ -1,10 +1,10 @@
 package com.kcs.zolang.dto.response;
 
+import static com.kcs.zolang.utility.MonitoringUtil.getAge;
+
 import io.kubernetes.client.openapi.models.V1Pod;
-import io.kubernetes.client.openapi.models.V1PodCondition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.time.format.DateTimeFormatter;
-import java.util.List;
 import java.util.Map;
 import lombok.Builder;
 
@@ -15,9 +15,9 @@ public record PodMetadataDto(
     String name,
     @Schema(description = "Pod 네임스페이스", example = "default")
     String namespace,
-    @Schema(description = "Conditions", example = "ready")
-    List<String> conditions,
-    @Schema(description = "Pod 생성 시간", example = "2024.01.01")
+    @Schema(description = "Pod 생성 날짜", example = "2024. 01. 01.")
+    String creationDate,
+    @Schema(description = "Pod 생성 시간", example = "AM 10:00")
     String creationTime,
     @Schema(description = "Pod 실행 시간", example = "1d")
     String age,
@@ -32,12 +32,11 @@ public record PodMetadataDto(
         return PodMetadataDto.builder()
             .name(pod.getMetadata().getName())
             .namespace(pod.getMetadata().getNamespace())
-            .conditions(
-                pod.getStatus().getConditions().stream().map(V1PodCondition::getType)
-                    .toList())
-            .creationTime(pod.getMetadata().getCreationTimestamp().toLocalDate()
-                .format(DateTimeFormatter.ofPattern("yyyy.MM.dd")))
-            .age(age)
+            .creationDate(pod.getMetadata().getCreationTimestamp().toLocalDate()
+                .format(DateTimeFormatter.ofPattern("yyyy .MM .dd .")))
+            .creationTime(pod.getMetadata().getCreationTimestamp().toLocalTime()
+                .format(DateTimeFormatter.ofPattern("a hh:mm:ss")))
+            .age(getAge(pod.getMetadata().getCreationTimestamp().toLocalDateTime()))
             .uid(pod.getMetadata().getUid())
             .labels(pod.getMetadata().getLabels())
             .annotations(pod.getMetadata().getAnnotations())
