@@ -5,12 +5,8 @@ import com.kcs.zolang.dto.global.ResponseDto;
 import com.kcs.zolang.dto.request.CommitDto;
 import com.kcs.zolang.service.GithubService;
 import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
-import org.springframework.security.oauth2.client.annotation.RegisteredOAuth2AuthorizedClient;
 import org.springframework.web.bind.annotation.*;
 
-@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/github")
