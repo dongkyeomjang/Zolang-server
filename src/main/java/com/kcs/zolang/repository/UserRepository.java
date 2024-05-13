@@ -14,11 +14,6 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long> {
     Optional<User> findByIdAndRefreshTokenAndIsLogin(Long id, String refreshToken, Boolean isLogin);
 
-    Optional<User> findBySerialId(String serialId);
-    Boolean existsBySerialId(String serialId);
-
-    User findByNickname(String nickname);
-
     @Query("select u.id as id, u.role as role, u.password as password from User u where u.serialId = :serialId")
     Optional<UserSecurityForm> findSecurityFormBySerialId(@Param("serialId") String serialId);
 
@@ -28,8 +23,6 @@ public interface UserRepository extends JpaRepository<User, Long> {
     @Modifying(clearAutomatically = true)
     @Query("update User u set u.refreshToken = :refreshToken, u.isLogin = :isLogin, u.githubAccessToken = :githubAccessToken where u.id = :id")
     void updateRefreshTokenAndLoginStatusAndGithubAccessToken(@Param("id") Long id, @Param("refreshToken") String refreshToken, @Param("isLogin") Boolean isLogin, @Param("githubAccessToken") String githubAccessToken);
-
-    boolean existsByNickname(String nickname);
 
     interface UserSecurityForm {
         Long getId();
