@@ -37,7 +37,7 @@ public record PodSimpleDto(
 
     public static PodSimpleDto fromEntity(V1Pod pod) {
         return PodSimpleDto.builder()
-            .name(pod.getMetadata().getName())
+            .name(Objects.requireNonNull(pod.getMetadata()).getName())
             .namespace(pod.getMetadata().getNamespace())
             .images(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
             .labels(pod.getMetadata().getLabels())

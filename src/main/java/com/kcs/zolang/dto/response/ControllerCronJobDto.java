@@ -6,6 +6,7 @@ import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 import io.kubernetes.client.openapi.models.V1CronJob;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.Map;
+import java.util.Objects;
 import lombok.Builder;
 
 @Builder
@@ -32,9 +33,9 @@ public record ControllerCronJobDto(
 
     public static ControllerCronJobDto fromEntity(V1CronJob cronJob) {
         return ControllerCronJobDto.builder()
-            .name(cronJob.getMetadata().getName())
+            .name(Objects.requireNonNull(cronJob.getMetadata()).getName())
             .labels(cronJob.getMetadata().getLabels())
-            .schedule(cronJob.getSpec().getSchedule())
+            .schedule(Objects.requireNonNull(cronJob.getSpec()).getSchedule())
             .suspend(cronJob.getSpec().getSuspend() != null && cronJob.getSpec().getSuspend())
             .active(cronJob.getStatus().getActive() == null ? 0
                 : cronJob.getStatus().getActive().size())
@@ -43,7 +44,8 @@ public record ControllerCronJobDto(
                 cronJob.getStatus().getLastScheduleTime().toLocalDateTime() == null ? null
                     : cronJob.getStatus().getLastScheduleTime().toLocalDateTime().format(
                         DATE_TIME_FORMATTER))
-            .age(getAge(cronJob.getMetadata().getCreationTimestamp().toLocalDateTime()))
+            .age(getAge(Objects.requireNonNull(cronJob.getMetadata().getCreationTimestamp())
+                .toLocalDateTime()))
             .creationDateTime(
                 cronJob.getMetadata().getCreationTimestamp().toLocalDateTime() == null ? null
                     : cronJob.getMetadata().getCreationTimestamp().toLocalDateTime()

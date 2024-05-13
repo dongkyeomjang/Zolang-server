@@ -2,6 +2,7 @@ package com.kcs.zolang.dto.response;
 
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
+import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1CronJob;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1Deployment;
@@ -11,6 +12,7 @@ import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import lombok.Builder;
 
 @Builder
@@ -34,86 +36,102 @@ public record PodControlledDto(
 
     public static PodControlledDto fromEntity(V1Deployment deployment) {
         return PodControlledDto.builder()
-            .name(deployment.getMetadata().getName())
+            .name(Objects.requireNonNull(deployment.getMetadata()).getName())
             .kind(deployment.getKind())
-            .replicas(deployment.getStatus().getReplicas())
-            .readyReplicas(deployment.getStatus().getReadyReplicas())
+            .replicas(
+                deployment.getStatus().getReplicas() != null ? deployment.getStatus().getReplicas()
+                    : 0)
+            .readyReplicas(
+                deployment.getStatus().getReadyReplicas() != null ? deployment.getStatus()
+                    .getReadyReplicas() : 0)
             .age(getAge(
-                deployment.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(deployment.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .images(deployment.getSpec().getTemplate().getSpec().getContainers().stream()
-                .map(it -> it.getImage()).toList())
+                .map(V1Container::getImage).toList())
             .labels(deployment.getMetadata().getLabels())
             .build();
     }
 
     public static PodControlledDto fromEntity(V1DaemonSet daemonSet) {
         return PodControlledDto.builder()
-            .name(daemonSet.getMetadata().getName())
+            .name(Objects.requireNonNull(daemonSet.getMetadata()).getName())
             .kind(daemonSet.getKind())
-            .replicas(daemonSet.getStatus().getNumberAvailable())
+            .replicas((daemonSet.getStatus().getNumberAvailable() == null ? 0
+                : daemonSet.getStatus().getNumberAvailable()) + (daemonSet.getStatus()
+                .getNumberUnavailable() == null ? 0 : daemonSet.getStatus().getNumberUnavailable()))
             .readyReplicas(daemonSet.getStatus().getNumberReady())
             .age(getAge(
-                daemonSet.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(daemonSet.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .images(daemonSet.getSpec().getTemplate().getSpec().getContainers().stream()
-                .map(it -> it.getImage()).toList())
+                .map(V1Container::getImage).toList())
             .labels(daemonSet.getMetadata().getLabels())
             .build();
     }
 
     public static PodControlledDto fromEntity(V1ReplicaSet replicaSet) {
+        replicaSet.getStatus().getReplicas();
         return PodControlledDto.builder()
-            .name(replicaSet.getMetadata().getName())
+            .name(Objects.requireNonNull(replicaSet.getMetadata()).getName())
             .kind(replicaSet.getKind())
             .replicas(replicaSet.getStatus().getReplicas())
-            .readyReplicas(replicaSet.getStatus().getReadyReplicas())
+            .readyReplicas(replicaSet.getStatus().getReadyReplicas() == null ? 0
+                : replicaSet.getStatus().getReadyReplicas())
             .age(getAge(
-                replicaSet.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(replicaSet.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .images(replicaSet.getSpec().getTemplate().getSpec().getContainers().stream()
-                .map(it -> it.getImage()).toList())
+                .map(V1Container::getImage).toList())
             .labels(replicaSet.getMetadata().getLabels())
             .build();
     }
 
     public static PodControlledDto fromEntity(V1StatefulSet statefulSet) {
+        statefulSet.getStatus().getReplicas();
         return PodControlledDto.builder()
-            .name(statefulSet.getMetadata().getName())
+            .name(Objects.requireNonNull(statefulSet.getMetadata()).getName())
             .kind(statefulSet.getKind())
             .replicas(statefulSet.getStatus().getReplicas())
-            .readyReplicas(statefulSet.getStatus().getReadyReplicas())
+            .readyReplicas(
+                statefulSet.getStatus().getReadyReplicas() != null ? statefulSet.getStatus()
+                    .getReadyReplicas() : 0)
             .age(getAge(
-                statefulSet.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(statefulSet.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .images(statefulSet.getSpec().getTemplate().getSpec().getContainers().stream()
-                .map(it -> it.getImage()).toList())
+                .map(V1Container::getImage).toList())
             .labels(statefulSet.getMetadata().getLabels())
             .build();
     }
 
     public static PodControlledDto fromEntity(V1CronJob cronJob) {
         return PodControlledDto.builder()
-            .name(cronJob.getMetadata().getName())
+            .name(Objects.requireNonNull(cronJob.getMetadata()).getName())
             .kind(cronJob.getKind())
             .replicas(0)
             .readyReplicas(0)
             .age(getAge(
-                cronJob.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(cronJob.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .images(
                 cronJob.getSpec().getJobTemplate().getSpec().getTemplate().getSpec().getContainers()
                     .stream()
-                    .map(it -> it.getImage()).toList())
+                    .map(V1Container::getImage).toList())
             .labels(cronJob.getMetadata().getLabels())
             .build();
     }
 
     public static PodControlledDto fromEntity(V1Job job) {
         return PodControlledDto.builder()
-            .name(job.getMetadata().getName())
+            .name(Objects.requireNonNull(job.getMetadata()).getName())
             .kind(job.getKind())
             .replicas(0)
             .readyReplicas(0)
             .age(getAge(
-                job.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(job.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .images(job.getSpec().getTemplate().getSpec().getContainers().stream()
-                .map(it -> it.getImage()).toList())
+                .map(V1Container::getImage).toList())
             .labels(job.getMetadata().getLabels())
             .build();
     }
