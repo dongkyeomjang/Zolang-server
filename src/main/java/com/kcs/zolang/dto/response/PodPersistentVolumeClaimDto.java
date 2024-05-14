@@ -6,6 +6,7 @@ import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
 import io.kubernetes.client.openapi.models.V1PersistentVolumeClaim;
 import io.swagger.v3.oas.annotations.media.Schema;
+import java.util.List;
 import java.util.Objects;
 import lombok.Builder;
 
@@ -25,7 +26,7 @@ public record PodPersistentVolumeClaimDto(
     @Schema(description = "PVC 용량", example = "1Gi")
     String capacity,
     @Schema(description = "PVC 접근 모드", example = "ReadWriteOnce")
-    String accessMode,
+    List<String> accessMode,
     @Schema(description = "PVC 스토리지 클래스", example = "grafana")
     String storageClass,
     @Schema(description = "PVC 생성 시간", example = "1d")
@@ -37,18 +38,19 @@ public record PodPersistentVolumeClaimDto(
     public static PodPersistentVolumeClaimDto fromEntity(
         V1PersistentVolumeClaim persistentVolumeClaim) {
         return PodPersistentVolumeClaimDto.builder()
-            .name(persistentVolumeClaim.getMetadata().getName())
+            .name(Objects.requireNonNull(persistentVolumeClaim.getMetadata()).getName())
             .namespace(persistentVolumeClaim.getMetadata().getNamespace())
             .label(Objects.toString(persistentVolumeClaim.getMetadata().getLabels()))
             .status(persistentVolumeClaim.getStatus().getPhase())
-            .volume(persistentVolumeClaim.getSpec().getVolumeName())
+            .volume(Objects.requireNonNull(persistentVolumeClaim.getSpec()).getVolumeName())
             .capacity(byteConverter(
                 persistentVolumeClaim.getStatus().getCapacity().get("storage").getNumber()
                     .toString()))
-            .accessMode(persistentVolumeClaim.getSpec().getAccessModes().toString())
+            .accessMode(persistentVolumeClaim.getSpec().getAccessModes())
             .storageClass(persistentVolumeClaim.getSpec().getStorageClassName())
             .age(getAge(
-                persistentVolumeClaim.getMetadata().getCreationTimestamp().toLocalDateTime()))
+                Objects.requireNonNull(persistentVolumeClaim.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()))
             .creationDateTime(
                 persistentVolumeClaim.getMetadata().getCreationTimestamp().toLocalDateTime()
                     .format(DATE_TIME_FORMATTER))

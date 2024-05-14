@@ -31,7 +31,9 @@ public record PodConditionsDto(
             .status(condition.getStatus())
             .lastProbeTime(getAge(condition.getLastProbeTime() == null ? null
                 : condition.getLastProbeTime().toLocalDateTime()))
-            .lastTransitionTime(getAge(condition.getLastTransitionTime().toLocalDateTime()))
+            .lastTransitionTime(getAge(
+                condition.getLastTransitionTime().toLocalDateTime() == null ? null
+                    : condition.getLastTransitionTime().toLocalDateTime()))
             .reason(condition.getReason())
             .message(condition.getMessage())
             .build();

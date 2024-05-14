@@ -67,7 +67,7 @@ public class MonitoringUtil {
     public ApiClient getV1Api(Long userId, Long clusterId) {
         Cluster clusters = clusterRepository.findById(clusterId)
             .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        if (clusters.getUser().getId() != userId) {
+        if (!clusters.getUser().getId().equals(userId)) {
             throw new CommonException(ErrorCode.NOT_FOUND_CLUSTER);
         }
         UserUrlTokenDto userUrlTokenDto = UserUrlTokenDto.fromEntity(clusters);

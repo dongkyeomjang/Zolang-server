@@ -1,9 +1,10 @@
 package com.kcs.zolang.dto.response;
 
+import io.kubernetes.client.openapi.models.V1LocalObjectReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import jakarta.annotation.Nullable;
-import java.util.List;
+import java.util.Objects;
 import lombok.Builder;
 
 @Builder
@@ -18,7 +19,7 @@ public record PodResourceDto(
     @Schema(description = "Priority Class", example = "Guaranteed")
     String priorityClass,
     @Schema(description = "Pod 재시작 횟수", example = "0")
-    List<Integer> restartCount,
+    int restartCount,
     @Schema(description = "서비스 어카운트", example = "default")
     String serviceAccount,
     @Nullable
@@ -28,16 +29,15 @@ public record PodResourceDto(
 
     public static PodResourceDto fromEntity(V1Pod pod) {
         return PodResourceDto.builder()
-            .node(pod.getSpec().getNodeName())
-            .status(pod.getStatus().getPhase())
+            .node(Objects.requireNonNull(pod.getSpec()).getNodeName())
+            .status(Objects.requireNonNull(pod.getStatus()).getPhase())
             .ip(pod.getStatus().getPodIP())
             .priorityClass(pod.getSpec().getPriorityClassName())
-            .restartCount(pod.getStatus().getContainerStatuses().stream()
-                .map(status -> status.getRestartCount()).toList())
+            .restartCount(pod.getStatus().getContainerStatuses().get(0).getRestartCount())
             .serviceAccount(pod.getSpec().getServiceAccountName())
             .imagePullSecret(
                 pod.getSpec().getImagePullSecrets() != null ? pod.getSpec().getImagePullSecrets()
-                    .stream().map(secret -> secret.getName()).toString() : null)
+                    .stream().map(V1LocalObjectReference::getName).toString() : null)
             .build();
     }
 }

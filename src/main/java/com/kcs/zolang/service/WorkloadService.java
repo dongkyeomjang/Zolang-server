@@ -28,6 +28,7 @@ import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.kubernetes.client.openapi.models.V1Volume;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
@@ -138,7 +139,8 @@ public class WorkloadService {
                 }
             }
             return PodDetailDto.fromEntity(pod,
-                getAge(pod.getMetadata().getCreationTimestamp().toLocalDateTime()),
+                getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
+                    .toLocalDateTime()),
                 controlledDtoList, pvcDtoList);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
@@ -265,9 +267,7 @@ public class WorkloadService {
         int[] replicaSetCount = {replicaSet.size(), 0};
         for (V1ReplicaSet r : replicaSet) {
             if (r.getStatus() != null) {
-                if (r.getStatus().getReplicas() != null) {
-                    replicaSetCount[1]++;
-                }
+                replicaSetCount[1]++;
             }
         }
         int[] statefulSetCount = {statefulSet.size(), 0};
