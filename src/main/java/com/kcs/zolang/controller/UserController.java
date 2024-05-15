@@ -17,12 +17,9 @@ import org.springframework.web.multipart.MultipartFile;
 public class UserController {
     private final UserService userService;
 
-    @GetMapping("/nickname-duplicate")
-    @Operation(summary = "닉네임 중복 확인", description = "닉네임 중복을 확인합니다.")
-    public ResponseDto<?> checkDuplicate(
-            @RequestParam(value = "nickname") String nickname
-    ) {
-        return ResponseDto.ok(userService.checkDuplicate(nickname));
+    @GetMapping("")
+    @Operation(summary = "유저 정보 조회", description = "유저 정보를 조회합니다.")
+    public ResponseDto<?> getUserInfo(@UserId Long userId) {
+        return ResponseDto.ok(userService.getUserInfo(userId));
     }
-
 }

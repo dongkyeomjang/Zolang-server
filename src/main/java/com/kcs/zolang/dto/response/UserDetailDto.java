@@ -18,16 +18,19 @@ public record UserDetailDto(
         @NotNull(message = "닉네임이 없습니다.")
         String nickname,
 
-        @Schema(description = "로그인 제공자", example = "KAKAO, GOOGLE, APPLE, DEFAULT")
-        @NotNull(message = "로그인 제공자가 없습니다.")
-        EProvider provider
+        @Schema(description = "프로필 이미지", example = "https://avatars.githubusercontent.com/u/86873281?v=4")
+        String profileImage,
+
+        @Schema(description = "이메일", example = "example@gmail.com")
+        String email
 
 ) {
         public static UserDetailDto fromEntity(User user) {
             return UserDetailDto.builder()
                     .id(user.getId())
                     .nickname(user.getNickname())
-                    .provider(user.getProvider())
+                    .profileImage(user.getProfileImage())
+                    .email(user.getEmail())
                     .build();
         }
 }

@@ -26,6 +26,6 @@ public class CustomLogoutProcessHandler implements LogoutHandler {
         }
 
         UserPrincipal userPrincipal = (UserPrincipal) authentication.getPrincipal();
-        userRepository.updateRefreshTokenAndLoginStatus(userPrincipal.getUserId(), null, false);
+        userRepository.updateRefreshTokenAndLoginStatusAndGithubAccessToken(userPrincipal.getUserId(), null, false, null);
     }
 }

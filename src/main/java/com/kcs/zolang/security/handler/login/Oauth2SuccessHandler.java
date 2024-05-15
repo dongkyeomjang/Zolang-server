@@ -9,7 +9,11 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import org.jasypt.encryption.StringEncryptor;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
+import org.springframework.security.oauth2.client.OAuth2AuthorizedClientService;
+import org.springframework.security.oauth2.client.authentication.OAuth2AuthenticationToken;
 import org.springframework.security.web.authentication.AuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
@@ -20,16 +24,30 @@ import java.io.IOException;
 public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
+    private final OAuth2AuthorizedClientService authorizedClientService;
+    private final StringEncryptor stringEncryptor; // StringEncryptor 추가
+
     @Override
     @Transactional
     public void onAuthenticationSuccess(HttpServletRequest request, HttpServletResponse response, Authentication authentication) throws IOException, ServletException {
+        OAuth2AuthenticationToken oauthToken = (OAuth2AuthenticationToken) authentication;
+        OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
+                oauthToken.getAuthorizedClientRegistrationId(),
+                oauthToken.getName());
+
+        if (client == null) {
+            throw new IllegalArgumentException("No client information available in session");
+        }
+
+        String originalAccessToken = client.getAccessToken().getTokenValue();
+        String encryptedAccessToken = stringEncryptor.encrypt(originalAccessToken); // 액세스 토큰 암호화
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(principal.getUserId(), principal.getRole());
 
-        userRepository.updateRefreshTokenAndLoginStatus(principal.getUserId(), jwtTokenDto.refreshToken(), true);
+        userRepository.updateRefreshTokenAndLoginStatusAndGithubAccessToken(
+                principal.getUserId(), jwtTokenDto.refreshToken(), true, encryptedAccessToken); // 암호화된 토큰 저장
 
         AuthenticationResponse.makeLoginSuccessResponse(response, jwtTokenDto, jwtUtil.getRefreshExpiration());
-
         response.sendRedirect("http://localhost:5173/dashboard");
     }
 }

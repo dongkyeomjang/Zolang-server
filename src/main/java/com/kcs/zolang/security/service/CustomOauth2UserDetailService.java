@@ -45,6 +45,7 @@ public class CustomOauth2UserDetailService extends DefaultOAuth2UserService {
                                             .role(ERole.GUEST)
                                             .nickname(oauth2UserInfo.getAttributes().get("login").toString())
                                             .email(oauth2UserInfo.getAttributes().get("email").toString())
+                                            .profileImage(oauth2UserInfo.getAttributes().get("avatar_url").toString())
                                             .build()
                             );
                             return UserRepository.UserSecurityForm.invoke(newUser);
