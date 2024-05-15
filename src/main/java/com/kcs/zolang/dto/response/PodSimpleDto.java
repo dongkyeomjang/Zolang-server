@@ -1,8 +1,10 @@
 package com.kcs.zolang.dto.response;
 
 import static com.kcs.zolang.utility.MonitoringUtil.DATE_TIME_FORMATTER;
+import static com.kcs.zolang.utility.MonitoringUtil.byteConverter;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
+import io.kubernetes.client.custom.PodMetrics;
 import io.kubernetes.client.openapi.models.V1Container;
 import io.kubernetes.client.openapi.models.V1ContainerStatus;
 import io.kubernetes.client.openapi.models.V1Pod;
@@ -29,6 +31,10 @@ public record PodSimpleDto(
     String status,
     @Schema(description = "Pod 재시작 횟수", example = "0")
     List<Integer> restartCount,
+    @Schema(description = "Pod cpu 사용량", example = "1.00m")
+    String cpuUsage,
+    @Schema(description = "Pod 메모리 사용량", example = "80.90Mi")
+    String memoryUsage,
     @Schema(description = "Pod 생성 시간", example = "1d")
     String age,
     @Schema(description = "Pod 생성 일시", example = "2021-12-01 오후 12:00:00")
@@ -47,6 +53,27 @@ public record PodSimpleDto(
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
+            .creationDateTime(pod.getMetadata().getCreationTimestamp().toLocalDateTime().format(
+                DATE_TIME_FORMATTER))
+            .build();
+    }
+
+    public static PodSimpleDto fromEntity(V1Pod pod, PodMetrics podMetrics) {
+        return PodSimpleDto.builder()
+            .name(pod.getMetadata().getName())
+            .namespace(pod.getMetadata().getNamespace())
+            .images(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
+            .labels(pod.getMetadata().getLabels())
+            .restartCount(pod.getStatus().getContainerStatuses().stream()
+                .map(V1ContainerStatus::getRestartCount).toList())
+            .node(pod.getSpec().getNodeName())
+            .age(getAge(
+                Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
+            .status(pod.getStatus().getPhase())
+            .cpuUsage(podMetrics.getContainers().stream().map(it -> byteConverter(
+                Double.toString(it.getUsage().get("cpu").getNumber().doubleValue()))).toString())
+            .memoryUsage(podMetrics.getContainers().stream()
+                .map(it -> it.getUsage().get("memory").getNumber().doubleValue()).toString() + "m")
             .creationDateTime(pod.getMetadata().getCreationTimestamp().toLocalDateTime().format(
                 DATE_TIME_FORMATTER))
             .build();

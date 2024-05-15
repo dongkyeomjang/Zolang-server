@@ -65,9 +65,12 @@ dependencies {
 
     implementation 'org.bouncycastle:bcprov-jdk18on:1.75'
 
+    //kubernetes client
     // https://mvnrepository.com/artifact/io.kubernetes/client-java-extended
     implementation 'io.kubernetes:client-java-extended:20.0.1'
 
+    // Redis
+    implementation 'org.springframework.boot:spring-boot-starter-data-redis'
 }
 
 tasks.named('test') {

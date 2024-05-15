@@ -1,6 +1,7 @@
 package com.kcs.zolang.service;
 
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
+import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
@@ -12,6 +13,8 @@ import com.kcs.zolang.dto.response.WorkloadOverviewDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
+import io.kubernetes.client.custom.PodMetrics;
+import io.kubernetes.client.extended.kubectl.exception.KubectlException;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
@@ -21,6 +24,7 @@ import io.kubernetes.client.openapi.models.V1CronJob;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1Namespace;
 import io.kubernetes.client.openapi.models.V1NamespaceList;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
@@ -95,11 +99,21 @@ public class WorkloadService {
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1NamespaceList namespaceList = coreV1Api.listNamespace().execute();
+            List<PodSimpleDto> podSimpleDtoList = new ArrayList<>();
+            for (V1Namespace ns : namespaceList.getItems()) {
+                podSimpleDtoList.addAll(top(V1Pod.class,
+                    PodMetrics.class).apiClient(client)
+                    .namespace(Objects.requireNonNull(ns.getMetadata()).getName()).execute()
+                    .stream().map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight()))
+                    .toList());
+            }
             //모든 네임스페이스의 pod list
             return coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
                 .map(PodSimpleDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
+        } catch (KubectlException e) {
+            throw new CommonException(ErrorCode.KUBECTL_ERROR);
         }
     }
 
@@ -107,16 +121,17 @@ public class WorkloadService {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
-            /*
             //파드 사용량 추출
-            List<Pair<V1Pod, PodMetrics>> a = top(V1Pod.class, PodMetrics.class).apiClient(client)
-                .namespace(namespace)
-                .execute();*/
+            List<PodSimpleDto> podUsage = top(V1Pod.class, PodMetrics.class).apiClient(
+                    client).namespace(namespace).execute().stream()
+                .map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight())).toList();
             //특정 네임스페이스의 pod list
             return coreV1Api.listNamespacedPod(namespace).execute().getItems().stream()
                 .map(PodSimpleDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
+        } catch (KubectlException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -125,7 +140,7 @@ public class WorkloadService {
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
-            String podNamespace = pod.getMetadata().getNamespace();
+            String podNamespace = Objects.requireNonNull(pod.getMetadata()).getNamespace();
             List<PodControlledDto> controlledDtoList = pod.getMetadata().getOwnerReferences()
                 .stream().map(it ->
                     getControlled(it.getKind(), it.getName(), podNamespace))

@@ -7,7 +7,9 @@ import com.kcs.zolang.service.WorkloadService;
 import io.swagger.v3.oas.annotations.Operation;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -22,6 +24,8 @@ import org.springframework.web.bind.annotation.RestController;
 public class WorkloadController {
 
     private final WorkloadService podService;
+
+    private final RedisTemplate<String, Object> redisTemplate;
 
     @GetMapping("/{clusterId}")
     @Operation(summary = "workload overview 조회", description = "모든 네임스페이스의 workload overview 조회")
@@ -139,5 +143,17 @@ public class WorkloadController {
         Long clusterId
     ) {
         return ResponseDto.ok(podService.getJobList(userId, clusterId));
+    }
+
+    @GetMapping("test")
+    public String test() {
+        redisTemplate.opsForValue().set("cluster-matric:${clusterId}:${mm}", "매트릭 정보 object");
+        redisTemplate.expire("cluster-matric:${clusterId}:${mm}", 14, TimeUnit.MINUTES);
+        // 1번 클러스터 21분의 데이터 가져오기
+        redisTemplate.opsForValue().get("cluster-matric:1:21");
+
+        // 1번 클러스터 21분과 22분 데이터 가져오기 여러개 가져올땐 무조건 이게 권장됨
+        redisTemplate.opsForValue().multiGet(List.of("cluster-matric:1:21", "cluster-matric:1:22"));
+        return "test";
     }
 }
