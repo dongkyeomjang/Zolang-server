@@ -65,8 +65,9 @@ dependencies {
 
     implementation 'org.bouncycastle:bcprov-jdk18on:1.75'
 
-    // Kubernetes java client
-    implementation 'io.kubernetes:client-java:20.0.1'
+    // https://mvnrepository.com/artifact/io.kubernetes/client-java-extended
+    implementation 'io.kubernetes:client-java-extended:20.0.1'
+
 }
 
 tasks.named('test') {

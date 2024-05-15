@@ -1,5 +1,6 @@
 package com.kcs.zolang.dto.response;
 
+import static com.kcs.zolang.utility.MonitoringUtil.DATE_TIME_FORMATTER;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
 import io.kubernetes.client.openapi.models.V1Container;
@@ -19,7 +20,7 @@ public record PodSimpleDto(
     @Schema(description = "Pod 네임스페이스", example = "sandbox")
     String namespace,
     @Schema(description = "Pod 이미지", example = "registry.k8s.io/ingress-nginx/controller:v1.1.1")
-    List<String> image,
+    List<String> images,
     @Schema(description = "Pod 레이블", example = "app:nginx")
     Map<String, String> labels,
     @Schema(description = "Pod 노드", example = "node-name")
@@ -29,13 +30,16 @@ public record PodSimpleDto(
     @Schema(description = "Pod 재시작 횟수", example = "0")
     List<Integer> restartCount,
     @Schema(description = "Pod 생성 시간", example = "1d")
-    String age) {
+    String age,
+    @Schema(description = "Pod 생성 일시", example = "2021-12-01 오후 12:00:00")
+    String creationDateTime
+) {
 
     public static PodSimpleDto fromEntity(V1Pod pod) {
         return PodSimpleDto.builder()
-            .name(pod.getMetadata().getName())
+            .name(Objects.requireNonNull(pod.getMetadata()).getName())
             .namespace(pod.getMetadata().getNamespace())
-            .image(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
+            .images(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
             .labels(pod.getMetadata().getLabels())
             .restartCount(pod.getStatus().getContainerStatuses().stream()
                 .map(V1ContainerStatus::getRestartCount).toList())
@@ -43,6 +47,8 @@ public record PodSimpleDto(
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
+            .creationDateTime(pod.getMetadata().getCreationTimestamp().toLocalDateTime().format(
+                DATE_TIME_FORMATTER))
             .build();
     }
 }
