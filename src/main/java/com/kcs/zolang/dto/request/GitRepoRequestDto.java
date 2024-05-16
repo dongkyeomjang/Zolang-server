@@ -1,13 +1,11 @@
 package com.kcs.zolang.dto.request;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
+import lombok.Builder;
 
-public record GitRepoDto(
-        @JsonProperty("name")
-        String name,
-        @JsonProperty("branches_url")
-        String branchesUrl,
-        @JsonProperty("commits_url")
-        String commitsUrl
+@Builder
+public record GitRepoRequestDto(
+        @JsonProperty("repo_name")
+        String repoName
 ) {
 }

@@ -13,7 +13,7 @@ import java.time.LocalDateTime;
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 @Table(name = "repository")
-public class Repository {
+public class CICD {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     @Column(name = "repository_id")
@@ -26,18 +26,23 @@ public class Repository {
     @Column(name = "repository_name", nullable = false)
     private String repositoryName;
 
+    @Column(name = "branch_name", nullable = false)
+    private String branchName;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Repository(User user, String repositoryName) {
+    public CICD(User user, String repositoryName, String branchName) {
         this.user = user;
         this.repositoryName = repositoryName;
         this.createdAt = LocalDateTime.now();
+        this.branchName = branchName;
     }
 
-    public void update(String repositoryName) {
+    public void update(String repositoryName, String branchName) {
         this.repositoryName = repositoryName;
+        this.branchName = branchName;
     }
 }

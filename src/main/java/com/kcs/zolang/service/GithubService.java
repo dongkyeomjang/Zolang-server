@@ -6,18 +6,22 @@ import com.kcs.zolang.dto.response.GitRepoDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.UserRepository;
+import io.jsonwebtoken.Jwts;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jasypt.encryption.StringEncryptor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
+import org.springframework.security.oauth2.jose.jws.SignatureAlgorithm;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
 
-import java.util.Base64;
-import java.util.List;
-import java.util.Map;
+import java.security.KeyFactory;
+import java.security.PrivateKey;
+import java.security.spec.PKCS8EncodedKeySpec;
+import java.util.*;
 import java.util.stream.Collectors;
 @Slf4j
 @RequiredArgsConstructor
@@ -25,8 +29,22 @@ import java.util.stream.Collectors;
 public class GithubService {
     private final UserRepository userRepository;
     private final StringEncryptor stringEncryptor;
+    private final RestTemplate restTemplate;
+    @Value("${github.app-id}")
+    private String appId;
+    @Value("${github.secret}")
+    private String privateKeyStr;
+    @Value("${github.webhook-url}")
+    private String webhookUrl;
+
+    private HttpHeaders createHeaders(String token) {
+        HttpHeaders headers = new HttpHeaders();
+        headers.set("Authorization", "token " + token);
+        headers.set("X-GitHub-Api-Version", "2022-11-28");
+        return headers;
+    }
+
     public List<GitRepoDto> getRepositories(Long userId) {
-        RestTemplate restTemplate = new RestTemplate();
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl("https://api.github.com")
                 .path("/users/"
@@ -44,12 +62,10 @@ public class GithubService {
                 .map(repo -> GitRepoDto.builder()
                         .name(repo.get("name").toString())
                         .branchesUrl(repo.get("branches_url").toString())
-                        .commitsUrl(repo.get("commits_url").toString())
                         .build())
                 .collect(Collectors.toList());
     }
     public List<GitBranchDto> getBranches(Long userId, String repoName){
-        RestTemplate restTemplate = new RestTemplate();
         UriComponentsBuilder builder = UriComponentsBuilder
                 .fromHttpUrl("https://api.github.com")
                 .path("/repos/"
@@ -77,7 +93,6 @@ public class GithubService {
                 .collect(Collectors.toList());
     }
     public Boolean createCommit(Long userId, String repoName, String branchName, CommitDto commitDto) {
-        RestTemplate restTemplate = new RestTemplate();
         String nickname = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER))
                 .getNickname();
@@ -92,10 +107,7 @@ public class GithubService {
                 .path(path)
                 .queryParam("ref", branchName);
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.set("Authorization", "token " + token);
-        headers.set("X-GitHub-Api-Version", "2022-11-28");
-        HttpEntity<String> requestEntity = new HttpEntity<>(headers);
+        HttpEntity<String> requestEntity = new HttpEntity<>(createHeaders(token));
 
         ResponseEntity<Map> response;
         try {
@@ -121,7 +133,6 @@ public class GithubService {
     }
 
     private Boolean createFile(String nickname, String repoName, String branchName, CommitDto commitDto, String token) {
-        RestTemplate restTemplate = new RestTemplate();
         String encodedContent = Base64.getEncoder().encodeToString(commitDto.content().getBytes());
         String createUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
         Map<String, Object> createRequest = Map.of(
@@ -134,11 +145,7 @@ public class GithubService {
                 "branch", branchName
         );
 
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        headers.set("Authorization", "token " + token);
-        headers.set("X-GitHub-Api-Version", "2022-11-28");
-        HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, headers);
+        HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, createHeaders(token));
 
         ResponseEntity<Map> createResponse = restTemplate.exchange(
                 createUrl,
@@ -150,7 +157,6 @@ public class GithubService {
     }
 
     private Boolean updateFile(String nickname, String repoName, String branchName, CommitDto commitDto, String encodedContent, String sha, String token) {
-        RestTemplate restTemplate = new RestTemplate();
         String updateUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
         Map<String, Object> updateRequest = Map.of(
                 "message", "update " + commitDto.fileName(),
@@ -163,11 +169,7 @@ public class GithubService {
                 "branch", branchName
         );
 
-        HttpHeaders updateHeaders = new HttpHeaders();
-        updateHeaders.setContentType(MediaType.APPLICATION_JSON);
-        updateHeaders.set("Authorization", "token " + token);
-        updateHeaders.set("X-GitHub-Api-Version", "2022-11-28");
-        HttpEntity<Map<String, Object>> updateEntity = new HttpEntity<>(updateRequest, updateHeaders);
+        HttpEntity<Map<String, Object>> updateEntity = new HttpEntity<>(updateRequest, createHeaders(token));
 
         ResponseEntity<Map> updateResponse = restTemplate.exchange(
                 updateUrl,
@@ -176,5 +178,31 @@ public class GithubService {
                 Map.class);
 
         return updateResponse.getStatusCode().is2xxSuccessful();
+    }
+    public void createWebhook(Long userId, String repoName) {
+        String nickname = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER))
+                .getNickname();
+
+        String token = stringEncryptor.decrypt(userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER))
+                .getGithubAccessToken());
+
+        String apiUrl = String.format("https://api.github.com/repos/%s/%s/hooks", nickname, repoName);
+
+        Map<String, Object> body = new HashMap<>();
+        body.put("name", "web");
+        body.put("active", true);
+        body.put("events", Arrays.asList("push", "pull_request"));
+
+        Map<String, String> config = new HashMap<>();
+        config.put("url", webhookUrl);
+        config.put("content_type", "json");
+
+        body.put("config", config);
+
+        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders(token));
+
+        restTemplate.postForEntity(apiUrl, entity, String.class);
     }
 }
