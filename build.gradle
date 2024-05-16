@@ -60,10 +60,15 @@ dependencies {
     // lang3
     implementation 'org.apache.commons:commons-lang3:3.12.0'
 
+    // Apache HttpClient
     implementation 'org.apache.httpcomponents.client5:httpclient5:5.3.1'
     implementation 'org.apache.httpcomponents.core5:httpcore5:5.2.4'
 
+    // Bouncy Castle
     implementation 'org.bouncycastle:bcprov-jdk18on:1.75'
+
+    // Jasypt
+    implementation group: 'org.jasypt', name: 'jasypt', version: '1.9.2'
 
     //kubernetes client
     // https://mvnrepository.com/artifact/io.kubernetes/client-java-extended

@@ -124,10 +124,6 @@ public class ClusterService {
                     Map<String, Object> allocatable = (Map<String, Object>) status.get("allocatable");
                     Map<String, Object> capacity = (Map<String, Object>) status.get("capacity");
                     List<Map<String, Object>> conditions = ((List<Map<String, Object>>) status.get("conditions"));
-                    Map<String, Object> conditionReady = conditions.stream()
-                                    .filter(condition -> "Ready".equals(condition.get("type")))
-                                    .findFirst()
-                                            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CONDITION));
                     allocatableList.put("allocatable-cpu", allocatable.get("cpu"));
                     allocatableList.put("allocatable-memory", allocatable.get("memory"));
                     allocatableList.put("allocatable-pods", allocatable.get("pods"));
@@ -138,7 +134,7 @@ public class ClusterService {
                     nodeDetails.put("capacity", capacityList);
                     nodeDetails.put("created", metadata.get("creationTimestamp"));
                     nodeDetails.put("name", metadata.get("name"));
-                    nodeDetails.put("ready", conditionReady.get("status"));
+                    nodeDetails.put("conditions", conditions);
                     nodeDetails.put("KubeletVersion", nodeInfo.get("kubeletVersion"));
 
                     result.add(nodeDetails);  // 개별 노드의 상세 정보를 결과 리스트에 추가

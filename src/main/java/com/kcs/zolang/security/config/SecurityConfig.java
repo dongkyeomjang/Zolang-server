@@ -6,8 +6,6 @@ import com.kcs.zolang.security.filter.JwtAuthenticationFilter;
 import com.kcs.zolang.security.filter.JwtExceptionFilter;
 import com.kcs.zolang.security.handler.jwt.JwtAccessDeniedHandler;
 import com.kcs.zolang.security.handler.jwt.JwtAuthEntryPoint;
-import com.kcs.zolang.security.handler.login.DefaultFailureHandler;
-import com.kcs.zolang.security.handler.login.DefaultSuccessHandler;
 import com.kcs.zolang.security.handler.login.Oauth2FailureHandler;
 import com.kcs.zolang.security.handler.login.Oauth2SuccessHandler;
 import com.kcs.zolang.security.handler.logout.CustomLogoutProcessHandler;
@@ -29,8 +27,6 @@ import org.springframework.security.web.authentication.logout.LogoutFilter;
 @EnableWebSecurity
 @RequiredArgsConstructor
 public class SecurityConfig {
-    private final DefaultSuccessHandler defaultSuccessHandler;
-    private final DefaultFailureHandler defaultFailureHandler;
     private final CustomLogoutProcessHandler customSignOutProcessHandler;
     private final CustomLogoutResultHandler customSignOutResultHandler;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
@@ -57,15 +53,8 @@ public class SecurityConfig {
                                 .anyRequest().authenticated()
                 )
 
-                .formLogin(configurer ->
-                        configurer
-                                .loginPage("/login")
-                                .loginProcessingUrl("/api/v1/auth/login")
-                                .usernameParameter("serial_id")
-                                .passwordParameter("password")
-                                .successHandler(defaultSuccessHandler)
-                                .failureHandler(defaultFailureHandler)
-                )
+                .formLogin(AbstractHttpConfigurer::disable)
+
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                         .failureHandler(oauth2FailureHandler)

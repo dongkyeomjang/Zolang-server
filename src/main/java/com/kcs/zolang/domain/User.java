@@ -44,7 +44,10 @@ public class User {
     @Column(name = "nickname", nullable = false)
     private String nickname;
 
-    @Column(name = "email", nullable = false)
+    @Column(name = "profile_image", nullable = true)
+    private String profileImage;
+
+    @Column(name = "email", nullable = true)
     private String email;
 
     /* User Status */
@@ -54,14 +57,18 @@ public class User {
     @Column(name = "refresh_token")
     private String refreshToken;
 
+    @Column(name = "github_access_token")
+    private String githubAccessToken;
+
     @Builder
-    public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname) {
+    public User(String serialId, String password, EProvider provider, ERole role, String email, String nickname, String profileImage) {
         this.serialId = serialId;
         this.password = password;
         this.provider = provider;
         this.role = role;
         this.email = email;
         this.nickname = nickname;
+        this.profileImage = profileImage;
         this.createdAt = LocalDateTime.now();
         this.isLogin = false;
     }

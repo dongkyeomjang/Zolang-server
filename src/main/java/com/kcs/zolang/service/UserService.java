@@ -14,7 +14,10 @@ import org.springframework.web.multipart.MultipartFile;
 @RequiredArgsConstructor
 public class UserService {
     private final UserRepository userRepository;
-    public boolean checkDuplicate(String nickname) {
-        return userRepository.existsByNickname(nickname);
+
+    public UserDetailDto getUserInfo(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
+        return UserDetailDto.fromEntity(user);
     }
 }
