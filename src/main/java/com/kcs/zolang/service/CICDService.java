@@ -18,11 +18,14 @@ public class CICDService {
     private final UserRepository userRepository;
     private final GithubService githubService;
     public void registerRepository(Long userId, GitRepoRequestDto requestDto) {
+        var user = userRepository.findById(userId).orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
+
+        githubService.createWebhook(userId, requestDto.repoName());
+
         CICD cicd = CICD.builder()
                 .repositoryName(requestDto.repoName())
-                .user(userRepository.findById(userId).orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER)))
+                .user(user)
                 .build();
-        githubService.createWebhook(userId, requestDto.repoName());
         cicdRepository.save(cicd);
     }
     public void handleGithubWebhook(Map<String, Object> payload) {
