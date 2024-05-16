@@ -174,21 +174,24 @@ public class GithubService {
         String token = getUserGithubToken(userId);
 
         String apiUrl = String.format("https://api.github.com/repos/%s/%s/hooks", nickname, repoName);
+        try {
+            Map<String, Object> body = new HashMap<>();
+            body.put("name", "web");
+            body.put("active", true);
+            body.put("events", Arrays.asList("push", "pull_request"));
 
-        Map<String, Object> body = new HashMap<>();
-        body.put("name", "web");
-        body.put("active", true);
-        body.put("events", Arrays.asList("push", "pull_request"));
+            Map<String, String> config = new HashMap<>();
+            config.put("url", webhookUrl);
+            config.put("content_type", "json");
 
-        Map<String, String> config = new HashMap<>();
-        config.put("url", webhookUrl);
-        config.put("content_type", "json");
+            body.put("config", config);
 
-        body.put("config", config);
+            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders(token));
 
-        HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders(token));
-
-        restTemplate.postForEntity(apiUrl, entity, String.class);
+            restTemplate.postForEntity(apiUrl, entity, String.class);
+        } catch (HttpClientErrorException e) {
+            throw new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK);
+        }
     }
 
     private String getUserNickname(Long userId) {
