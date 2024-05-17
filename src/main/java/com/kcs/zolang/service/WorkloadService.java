@@ -3,12 +3,15 @@ package com.kcs.zolang.service;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
 import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
+import com.kcs.zolang.dto.response.UsageDto;
 import com.kcs.zolang.dto.response.WorkloadOverviewDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
@@ -26,14 +29,17 @@ import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1Namespace;
 import io.kubernetes.client.openapi.models.V1NamespaceList;
+import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.kubernetes.client.openapi.models.V1Volume;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -41,6 +47,11 @@ import org.springframework.stereotype.Service;
 public class WorkloadService {
 
     private final MonitoringUtil monitoringUtil;
+
+    private final RedisTemplate<String, Object> redisTemplate;
+
+    private final ObjectMapper objectMapper;
+
 
     public WorkloadOverviewDto getOverview(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
@@ -140,17 +151,15 @@ public class WorkloadService {
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
-            String podNamespace = Objects.requireNonNull(pod.getMetadata()).getNamespace();
-            List<PodControlledDto> controlledDtoList = pod.getMetadata().getOwnerReferences()
-                .stream().map(it ->
-                    getControlled(it.getKind(), it.getName(), podNamespace))
-                .toList();
+            V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
+            PodControlledDto controlledDtoList = getControlled(ownerReference.getKind(),
+                ownerReference.getName(), namespace);
             List<PodPersistentVolumeClaimDto> pvcDtoList = new ArrayList<>();
             List<V1Volume> podSpec = pod.getSpec().getVolumes();
             for (V1Volume v : podSpec) {
                 if (v.getPersistentVolumeClaim() != null) {
                     pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
-                        v.getPersistentVolumeClaim().getClaimName(), podNamespace));
+                        v.getPersistentVolumeClaim().getClaimName(), namespace));
                 }
             }
             return PodDetailDto.fromEntity(pod,
@@ -226,6 +235,27 @@ public class WorkloadService {
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
+    }
+
+    public List<UsageDto> getUsage(Long clusterId, String podName) {
+        int now = LocalDateTime.now().getMinute();
+        List<String> keys = new ArrayList<>();
+        for (int i = 13; i > 0; i--) {
+            keys.add("cluster-usage:" + clusterId + ":" + podName + ":" + (now - i));
+        }
+        List<String> jsonData = redisTemplate.opsForValue().multiGet(keys).stream()
+            .map(it -> (String) it).toList();
+        List<UsageDto> usageDtoList = new ArrayList<>();
+        for (String data : jsonData) {
+            try {
+                if (data != null) {
+                    usageDtoList.add(objectMapper.readValue(data, UsageDto.class));
+                }
+            } catch (JsonProcessingException e) {
+                throw new RuntimeException(e);
+            }
+        }
+        return usageDtoList;
     }
 
     private PodControlledDto getControlled(String kind, String name, String namespace) {
@@ -322,11 +352,11 @@ public class WorkloadService {
             statefulSetCount, cronJobCount, jobCount, podCount);
     }
 
-    private PodPersistentVolumeClaimDto getPersistentVolumeClaim(CoreV1Api coreV1Api,
-        String name, String podNamespace) {
+    private PodPersistentVolumeClaimDto getPersistentVolumeClaim(CoreV1Api coreV1Api, String name,
+        String namespace) {
         try {
             return PodPersistentVolumeClaimDto.fromEntity(
-                coreV1Api.readNamespacedPersistentVolumeClaim(name, podNamespace).execute());
+                coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace).execute());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }

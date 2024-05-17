@@ -15,14 +15,14 @@ public record PodDetailDto(
     @Schema(description = "Pod 조건")
     List<PodConditionsDto> conditions,
     @Schema(description = "Pod  제약")
-    List<PodControlledDto> controlled,
+    PodControlledDto controlled,
     @Nullable
     @Schema(description = "퍼시스턴트 볼륨 클레임")
     List<PodPersistentVolumeClaimDto> persistentVolumeClaims
 ) {
 
     public static PodDetailDto fromEntity(V1Pod pod, String age,
-        List<PodControlledDto> controlledDtoList, List<PodPersistentVolumeClaimDto> pvcDtoList) {
+        PodControlledDto controlledDtoList, List<PodPersistentVolumeClaimDto> pvcDtoList) {
         return PodDetailDto.builder()
             .metadata(PodMetadataDto.fromEntity(pod, age))
             .resource(PodResourceDto.fromEntity(pod))

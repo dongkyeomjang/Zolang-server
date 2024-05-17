@@ -1,7 +1,6 @@
 package com.kcs.zolang.dto.response;
 
 import static com.kcs.zolang.utility.MonitoringUtil.DATE_TIME_FORMATTER;
-import static com.kcs.zolang.utility.MonitoringUtil.byteConverter;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
 import io.kubernetes.client.custom.PodMetrics;
@@ -70,10 +69,6 @@ public record PodSimpleDto(
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
-            .cpuUsage(podMetrics.getContainers().stream().map(it -> byteConverter(
-                Double.toString(it.getUsage().get("cpu").getNumber().doubleValue()))).toString())
-            .memoryUsage(podMetrics.getContainers().stream()
-                .map(it -> it.getUsage().get("memory").getNumber().doubleValue()).toString() + "m")
             .creationDateTime(pod.getMetadata().getCreationTimestamp().toLocalDateTime().format(
                 DATE_TIME_FORMATTER))
             .build();
