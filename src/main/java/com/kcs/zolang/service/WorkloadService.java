@@ -152,7 +152,7 @@ public class WorkloadService {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
             V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
-            PodControlledDto controlledDtoList = getControlled(ownerReference.getKind(),
+            PodControlledDto controlledDto = getControlled(ownerReference.getKind(),
                 ownerReference.getName(), namespace);
             List<PodPersistentVolumeClaimDto> pvcDtoList = new ArrayList<>();
             List<V1Volume> podSpec = pod.getSpec().getVolumes();
@@ -165,7 +165,7 @@ public class WorkloadService {
             return PodDetailDto.fromEntity(pod,
                 getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
                     .toLocalDateTime()),
-                controlledDtoList, pvcDtoList);
+                controlledDto, pvcDtoList);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -176,6 +176,18 @@ public class WorkloadService {
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listDeploymentForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getDeploymentListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedDeployment(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
@@ -193,11 +205,35 @@ public class WorkloadService {
         }
     }
 
+    public List<CommonControllerDto> getDaemonSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedDaemonSet(namespace).execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<CommonControllerDto> getReplicaSetList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listReplicaSetForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getReplicaSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedReplicaSet(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
@@ -215,6 +251,18 @@ public class WorkloadService {
         }
     }
 
+    public List<CommonControllerDto> getStatefulSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedStatefulSet(namespace).execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<ControllerCronJobDto> getCronJobList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
@@ -226,11 +274,35 @@ public class WorkloadService {
         }
     }
 
+    public List<ControllerCronJobDto> getCronJobListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            BatchV1Api batchV1Api = new BatchV1Api();
+            return batchV1Api.listNamespacedCronJob(namespace).execute()
+                .getItems().stream().map(ControllerCronJobDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<CommonControllerDto> getJobList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
             return batchV1Api.listJobForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getJobListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            BatchV1Api batchV1Api = new BatchV1Api();
+            return batchV1Api.listNamespacedJob(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
