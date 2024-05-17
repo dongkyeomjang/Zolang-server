@@ -22,6 +22,7 @@ import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1NamespaceList;
+import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
@@ -125,23 +126,21 @@ public class WorkloadService {
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
-            String podNamespace = pod.getMetadata().getNamespace();
-            List<PodControlledDto> controlledDtoList = pod.getMetadata().getOwnerReferences()
-                .stream().map(it ->
-                    getControlled(it.getKind(), it.getName(), podNamespace))
-                .toList();
+            V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
+            PodControlledDto controlledDto = getControlled(ownerReference.getKind(),
+                ownerReference.getName(), namespace);
             List<PodPersistentVolumeClaimDto> pvcDtoList = new ArrayList<>();
             List<V1Volume> podSpec = pod.getSpec().getVolumes();
             for (V1Volume v : podSpec) {
                 if (v.getPersistentVolumeClaim() != null) {
                     pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
-                        v.getPersistentVolumeClaim().getClaimName(), podNamespace));
+                        v.getPersistentVolumeClaim().getClaimName(), namespace));
                 }
             }
             return PodDetailDto.fromEntity(pod,
                 getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
                     .toLocalDateTime()),
-                controlledDtoList, pvcDtoList);
+                controlledDto, pvcDtoList);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -152,6 +151,18 @@ public class WorkloadService {
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listDeploymentForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getDeploymentListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedDeployment(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
@@ -169,11 +180,35 @@ public class WorkloadService {
         }
     }
 
+    public List<CommonControllerDto> getDaemonSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedDaemonSet(namespace).execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<CommonControllerDto> getReplicaSetList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listReplicaSetForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getReplicaSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedReplicaSet(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
@@ -191,6 +226,18 @@ public class WorkloadService {
         }
     }
 
+    public List<CommonControllerDto> getStatefulSetListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            return appsV1Api.listNamespacedStatefulSet(namespace).execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<ControllerCronJobDto> getCronJobList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
@@ -202,11 +249,35 @@ public class WorkloadService {
         }
     }
 
+    public List<ControllerCronJobDto> getCronJobListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            BatchV1Api batchV1Api = new BatchV1Api();
+            return batchV1Api.listNamespacedCronJob(namespace).execute()
+                .getItems().stream().map(ControllerCronJobDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<CommonControllerDto> getJobList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
             return batchV1Api.listJobForAllNamespaces().execute()
+                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public List<CommonControllerDto> getJobListByNamespace(Long userId, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            BatchV1Api batchV1Api = new BatchV1Api();
+            return batchV1Api.listNamespacedJob(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);

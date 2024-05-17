@@ -5,6 +5,7 @@ import com.kcs.zolang.dto.global.ResponseDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
 import com.kcs.zolang.service.WorkloadService;
 import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/workloads")
 @Validated
+@Tag(name = "Monitoring-Workload", description = "Workload 모니터링 관련 API")
 public class WorkloadController {
 
     private final WorkloadService podService;
@@ -91,6 +93,20 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDeploymentList(userId, clusterId));
     }
 
+    @GetMapping("/{clusterId}/deployments/namespace")
+    @Operation(summary = "특정 네임스페이스 Deployment 목록 조회", description = "특정 네임스페이스 Deployment 목록 조회")
+    public ResponseDto<?> getDeploymentsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(
+            podService.getDeploymentListByNamespace(userId, namespace, clusterId));
+    }
+
     @GetMapping("/{clusterId}/daemons")
     @Operation(summary = "DaemonSet 목록 조회", description = "모든 네임스페이스 DaemonSet 목록 조회")
     public ResponseDto<?> getDaemonSets(
@@ -99,6 +115,19 @@ public class WorkloadController {
         Long clusterId
     ) {
         return ResponseDto.ok(podService.getDaemonSetList(userId, clusterId));
+    }
+
+    @GetMapping("/{clusterId}/daemons/namespace")
+    @Operation(summary = "특정 네임스페이스 DaemonSet 목록 조회", description = "특정 네임스페이스 DaemonSet 목록 조회")
+    public ResponseDto<?> getDaemonSetsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getDaemonSetListByNamespace(userId, namespace, clusterId));
     }
 
     @GetMapping("/{clusterId}/replicas")
@@ -111,6 +140,20 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getReplicaSetList(userId, clusterId));
     }
 
+    @GetMapping("/{clusterId}/replicas/namespace")
+    @Operation(summary = "특정 네임스페이스 ReplicaSet 목록 조회", description = "특정 네임스페이스 ReplicaSet 목록 조회")
+    public ResponseDto<?> getReplicaSetsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(
+            podService.getReplicaSetListByNamespace(userId, namespace, clusterId));
+    }
+
     @GetMapping("/{clusterId}/statefuls")
     @Operation(summary = "StatefulSet 목록 조회", description = "모든 네임스페이스 StatefulSet 목록 조회")
     public ResponseDto<?> getStatefulSets(
@@ -119,6 +162,20 @@ public class WorkloadController {
         Long clusterId
     ) {
         return ResponseDto.ok(podService.getStatefulSetList(userId, clusterId));
+    }
+
+    @GetMapping("/{clusterId}/statefuls/namespace")
+    @Operation(summary = "특정 네임스페이스 StatefulSet 목록 조회", description = "특정 네임스페이스 StatefulSet 목록 조회")
+    public ResponseDto<?> getStatefulSetsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(
+            podService.getStatefulSetListByNamespace(userId, namespace, clusterId));
     }
 
     @GetMapping("/{clusterId}/cron-jobs")
@@ -131,6 +188,19 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getCronJobList(userId, clusterId));
     }
 
+    @GetMapping("/{clusterId}/cron-jobs/namespace")
+    @Operation(summary = "특정 네임스페이스 CronJob 목록 조회", description = "특정 네임스페이스 CronJob 목록 조회")
+    public ResponseDto<?> getCronJobsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getCronJobListByNamespace(userId, namespace, clusterId));
+    }
+
     @GetMapping("/{clusterId}/jobs")
     @Operation(summary = "Job 목록 조회", description = "모든 네임스페이스 Job 목록 조회")
     public ResponseDto<?> getJobs(
@@ -139,5 +209,18 @@ public class WorkloadController {
         Long clusterId
     ) {
         return ResponseDto.ok(podService.getJobList(userId, clusterId));
+    }
+
+    @GetMapping("/{clusterId}/jobs/namespace")
+    @Operation(summary = "특정 네임스페이스 Job 목록 조회", description = "특정 네임스페이스 Job 목록 조회")
+    public ResponseDto<?> getJobsByNamespace(
+        @UserId Long userId,
+        @RequestParam(name = "namespace")
+        @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
+        String namespace,
+        @PathVariable(name = "clusterId")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getJobListByNamespace(userId, namespace, clusterId));
     }
 }
