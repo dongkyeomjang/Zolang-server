@@ -8,8 +8,8 @@ import lombok.Builder;
 
 @Builder
 public record PodDetailDto(
-    @Schema(description = "Pod 사용량")
-    List<UsageDto> podUsage,
+    @Schema(description = "Pod 지난 사용량 리스트")
+    List<UsageDto> metrics,
     @Schema(description = "Pod 메타데이터")
     PodMetadataDto metadata,
     @Schema(description = "Pod 리소스 정보")
@@ -25,9 +25,9 @@ public record PodDetailDto(
 
     public static PodDetailDto fromEntity(V1Pod pod, String age,
         PodControlledDto controlledDtoList, List<PodPersistentVolumeClaimDto> pvcDtoList,
-        List<UsageDto> podUsage) {
+        List<UsageDto> metrics) {
         return PodDetailDto.builder()
-            .podUsage(podUsage)
+            .metrics(metrics)
             .metadata(PodMetadataDto.fromEntity(pod, age))
             .resource(PodResourceDto.fromEntity(pod))
             .conditions(

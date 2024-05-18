@@ -115,7 +115,8 @@ public class WorkloadService {
                     PodMetrics.class).apiClient(client)
                     .namespace(ns.getMetadata().getName()).execute()
                     .stream().map(it -> it == null ? null
-                        : PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time))
+                        : PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time,
+                            getPodMetrics(clusterId, it.getLeft().getMetadata().getName(), m)))
                     .toList());
             }
             List<String> keys = new ArrayList<>();
@@ -140,7 +141,8 @@ public class WorkloadService {
             //파드 사용량 추출
             List<PodSimpleDto> podUsage = top(V1Pod.class, PodMetrics.class).apiClient(
                     client).namespace(namespace).execute().stream()
-                .map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time)).toList();
+                .map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time,
+                    getPodMetrics(clusterId, it.getLeft().getMetadata().getName(), m))).toList();
             List<String> keys = new ArrayList<>();
             for (int i = 13; i > 0; i--) {
                 keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
@@ -158,11 +160,7 @@ public class WorkloadService {
         monitoringUtil.getV1Api(userId, clusterId);
         int m = LocalDateTime.now().getMinute();
         try {
-            List<String> keys = new ArrayList<>();
-            for (int i = 13; i > 0; i--) {
-                keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
-            }
-            List<UsageDto> podUsage = getTotalUsage(keys);
+            List<UsageDto> podUsage = getPodMetrics(clusterId, name, m);
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
             V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
@@ -434,6 +432,14 @@ public class WorkloadService {
                 : (UsageDto) redisTemplate.opsForValue().get(key));
         }
         return usageDtoList;
+    }
+
+    private List<UsageDto> getPodMetrics(Long clusterId, String name, int m) {
+        List<String> keys = new ArrayList<>();
+        for (int i = 13; i > 0; i--) {
+            keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
+        }
+        return getTotalUsage(keys);
     }
 
     private String getTime(int m) {

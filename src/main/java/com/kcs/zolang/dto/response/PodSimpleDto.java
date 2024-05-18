@@ -30,15 +30,18 @@ public record PodSimpleDto(
     String status,
     @Schema(description = "Pod 재시작 횟수", example = "0")
     List<Integer> restartCount,
-    @Schema(description = "Pod 자원 사용량")
+    @Schema(description = "Pod 현재 자원 사용량")
     UsageDto usage,
+    @Schema(description = "Pod 지난 자원 사용량 리스트")
+    List<UsageDto> metrics,
     @Schema(description = "Pod 생성 시간", example = "1d")
     String age,
     @Schema(description = "Pod 생성 일시", example = "2021-12-01 오후 12:00:00")
     String creationDateTime
 ) {
 
-    public static PodSimpleDto fromEntity(V1Pod pod, PodMetrics podMetrics, String time) {
+    public static PodSimpleDto fromEntity(V1Pod pod, PodMetrics podMetrics, String time,
+        List<UsageDto> metrics) {
         return PodSimpleDto.builder()
             .name(pod.getMetadata().getName())
             .namespace(pod.getMetadata().getNamespace())
@@ -48,6 +51,7 @@ public record PodSimpleDto(
                 .map(V1ContainerStatus::getRestartCount).toList())
             .node(pod.getSpec().getNodeName())
             .usage(UsageDto.fromEntity(podMetrics, time))
+            .metrics(metrics)
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
