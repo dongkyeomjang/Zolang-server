@@ -3,12 +3,11 @@ package com.kcs.zolang.service;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
+import com.kcs.zolang.dto.response.PodListDto;
 import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
 import com.kcs.zolang.dto.response.UsageDto;
@@ -49,8 +48,6 @@ public class WorkloadService {
     private final MonitoringUtil monitoringUtil;
 
     private final RedisTemplate<String, Object> redisTemplate;
-
-    private final ObjectMapper objectMapper;
 
 
     public WorkloadOverviewDto getOverview(Long userId, Long clusterId) {
@@ -105,8 +102,10 @@ public class WorkloadService {
         }
     }
 
-    public List<PodSimpleDto> getPodList(Long userId, Long clusterId) {
+    public PodListDto getPodList(Long userId, Long clusterId) {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().getMinute();
+        String time = getTime(m);
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1NamespaceList namespaceList = coreV1Api.listNamespace().execute();
@@ -114,13 +113,18 @@ public class WorkloadService {
             for (V1Namespace ns : namespaceList.getItems()) {
                 podSimpleDtoList.addAll(top(V1Pod.class,
                     PodMetrics.class).apiClient(client)
-                    .namespace(Objects.requireNonNull(ns.getMetadata()).getName()).execute()
-                    .stream().map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight()))
+                    .namespace(ns.getMetadata().getName()).execute()
+                    .stream().map(it -> it == null ? null
+                        : PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time))
                     .toList());
             }
+            List<String> keys = new ArrayList<>();
+            for (int i = 13; i > 0; i--) {
+                keys.add("cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m - i)) % 60));
+            }
+            List<UsageDto> jsonData = getTotalUsage(keys);
             //모든 네임스페이스의 pod list
-            return coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
-                .map(PodSimpleDto::fromEntity).toList();
+            return PodListDto.fromEntity(jsonData, podSimpleDtoList);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         } catch (KubectlException e) {
@@ -128,19 +132,23 @@ public class WorkloadService {
         }
     }
 
-    public List<PodSimpleDto> getPodListByNamespace(Long userId, String namespace, Long clusterId) {
+    public PodListDto getPodListByNamespace(Long userId, String namespace, Long clusterId) {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().getMinute();
+        String time = getTime(m);
         try {
-            CoreV1Api coreV1Api = new CoreV1Api();
             //파드 사용량 추출
             List<PodSimpleDto> podUsage = top(V1Pod.class, PodMetrics.class).apiClient(
                     client).namespace(namespace).execute().stream()
-                .map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight())).toList();
+                .map(it -> PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time)).toList();
+            List<String> keys = new ArrayList<>();
+            for (int i = 13; i > 0; i--) {
+                keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
+                    (60 + (m - i)) % 60));
+            }
+            List<UsageDto> totalUsage = getTotalUsage(keys);
             //특정 네임스페이스의 pod list
-            return coreV1Api.listNamespacedPod(namespace).execute().getItems().stream()
-                .map(PodSimpleDto::fromEntity).toList();
-        } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            return PodListDto.fromEntity(totalUsage, podUsage);
         } catch (KubectlException e) {
             throw new RuntimeException(e);
         }
@@ -148,7 +156,13 @@ public class WorkloadService {
 
     public PodDetailDto getPodDetail(Long userId, String name, String namespace, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().getMinute();
         try {
+            List<String> keys = new ArrayList<>();
+            for (int i = 13; i > 0; i--) {
+                keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
+            }
+            List<UsageDto> podUsage = getTotalUsage(keys);
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
             V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
@@ -165,7 +179,7 @@ public class WorkloadService {
             return PodDetailDto.fromEntity(pod,
                 getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
                     .toLocalDateTime()),
-                controlledDto, pvcDtoList);
+                controlledDto, pvcDtoList, podUsage);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -309,27 +323,6 @@ public class WorkloadService {
         }
     }
 
-    public List<UsageDto> getUsage(Long clusterId, String podName) {
-        int now = LocalDateTime.now().getMinute();
-        List<String> keys = new ArrayList<>();
-        for (int i = 13; i > 0; i--) {
-            keys.add("cluster-usage:" + clusterId + ":" + podName + ":" + (now - i));
-        }
-        List<String> jsonData = redisTemplate.opsForValue().multiGet(keys).stream()
-            .map(it -> (String) it).toList();
-        List<UsageDto> usageDtoList = new ArrayList<>();
-        for (String data : jsonData) {
-            try {
-                if (data != null) {
-                    usageDtoList.add(objectMapper.readValue(data, UsageDto.class));
-                }
-            } catch (JsonProcessingException e) {
-                throw new RuntimeException(e);
-            }
-        }
-        return usageDtoList;
-    }
-
     private PodControlledDto getControlled(String kind, String name, String namespace) {
         AppsV1Api appsV1Api = new AppsV1Api();
         BatchV1Api batchV1Api = new BatchV1Api();
@@ -432,5 +425,19 @@ public class WorkloadService {
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
+    }
+
+    private List<UsageDto> getTotalUsage(List<String> keys) {
+        List<UsageDto> usageDtoList = new ArrayList<>();
+        for (String key : keys) {
+            usageDtoList.add(redisTemplate.opsForValue().get(key) == null ? null
+                : (UsageDto) redisTemplate.opsForValue().get(key));
+        }
+        return usageDtoList;
+    }
+
+    private String getTime(int m) {
+        int h = LocalDateTime.now().getHour();
+        return h + ":" + (m < 10 ? "0" + m : m);
     }
 }

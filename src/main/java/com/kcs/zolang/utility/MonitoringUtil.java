@@ -23,13 +23,17 @@ import java.text.DecimalFormat;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
+@Slf4j
 @Component
 @RequiredArgsConstructor
 public class MonitoringUtil {
@@ -94,31 +98,67 @@ public class MonitoringUtil {
         return client;
     }
 
-    @Scheduled(cron = "0 */1 * * * *")
+    //매분 10초마다
+    @Scheduled(cron = "10 * * * * *")
     public void saveResourceUsage() throws ApiException, KubectlException {
         List<User> users = userRepository.findAll();
+        int h = LocalDateTime.now().getHour();
+        int m = LocalDateTime.now().getMinute();
+        String time = h + ":" + (m < 10 ? "0" + m : m);
         for (User user : users) {
             List<Cluster> clusters = clusterRepository.findByUserId(user.getId());
             for (Cluster cluster : clusters) {
+                Map<String, Double> namespaceCpuUsage = new HashMap<>();
+                Map<String, Long> namespaceMemoryUsage = new HashMap<>();
+                double totalCpuUsage = 0;
+                long totalMemoryUsage = 0;
                 ApiClient client = getV1Api(user.getId(), cluster.getId());
                 CoreV1Api coreV1Api = new CoreV1Api();
                 V1PodList podList = coreV1Api.listPodForAllNamespaces().execute();
                 for (V1Pod pod : podList.getItems()) {
                     String name = pod.getMetadata().getName();
                     String namespace = pod.getMetadata().getNamespace();
-                    UsageDto podUsage = UsageDto.fromEntity(
-                        top(V1Pod.class, PodMetrics.class).apiClient(client)
-                            .name(name).namespace(namespace).execute().get(0).getRight());
-                    // 클러스터 cpu 사용량과 메모리 사용량을 레디스에 저장하기
-                    int m = LocalDateTime.now().getMinute();
+                    PodMetrics usage = top(V1Pod.class, PodMetrics.class).apiClient(client)
+                        .name(name).namespace(namespace).execute().get(0).getRight();
+                    if (usage == null) {
+                        continue;
+                    }
+                    UsageDto podUsage = UsageDto.fromEntity(usage, time);
+                    totalCpuUsage += podUsage.cpuUsage();
+                    totalMemoryUsage += podUsage.memoryUsage();
+                    if (namespaceCpuUsage.containsKey(namespace)) {
+                        namespaceCpuUsage.put(namespace,
+                            namespaceCpuUsage.get(namespace) + podUsage.cpuUsage());
+                        namespaceMemoryUsage.put(namespace,
+                            namespaceMemoryUsage.get(namespace) + podUsage.memoryUsage());
+                    } else {
+                        namespaceCpuUsage.put(namespace, podUsage.cpuUsage());
+                        namespaceMemoryUsage.put(namespace, podUsage.memoryUsage());
+                    }
                     redisTemplate.opsForValue()
                         .set("cluster-usage:" + cluster.getId() + ":" + name + ":" + m,
                             podUsage);
                     redisTemplate.expire("cluster-usage:" + cluster.getId() + ":" + name + ":" + m,
                         15, TimeUnit.MINUTES);
                 }
+                UsageDto totalUsage = UsageDto.fromEntity(totalCpuUsage, totalMemoryUsage, time);
+                redisTemplate.opsForValue()
+                    .set("cluster-usage:" + cluster.getId() + ":totalCpuUsage:" + m,
+                        totalUsage);
+                redisTemplate.expire("cluster-usage:" + cluster.getId() + ":totalCpuUsage:" + m,
+                    15, TimeUnit.MINUTES);
+                for (String namespace : namespaceCpuUsage.keySet()) {
+                    UsageDto namespaceUsage = UsageDto.fromEntity(namespaceCpuUsage.get(namespace),
+                        namespaceMemoryUsage.get(namespace), time);
+                    redisTemplate.opsForValue()
+                        .set("cluster-usage:" + cluster.getId() + ":" + namespace + ":" + m,
+                            namespaceUsage);
+                    redisTemplate.expire(
+                        "cluster-usage:" + cluster.getId() + ":" + namespace + ":" + m, 15,
+                        TimeUnit.MINUTES);
+                }
             }
         }
-        System.out.println("Resource Usage 저장 완료");
+        log.info("Resource Usage 저장 완료");
     }
 }

@@ -2,12 +2,11 @@ package com.kcs.zolang.controller;
 
 import com.kcs.zolang.annotation.UserId;
 import com.kcs.zolang.dto.global.ResponseDto;
-import com.kcs.zolang.dto.response.PodSimpleDto;
+import com.kcs.zolang.dto.response.PodListDto;
 import com.kcs.zolang.service.WorkloadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.constraints.NotBlank;
-import java.util.List;
 import lombok.RequiredArgsConstructor;
 import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -49,7 +48,7 @@ public class WorkloadController {
 
     @GetMapping("/{cluster_id}/workload/pods")
     @Operation(summary = "Pod 목록 조회", description = "모든 네임스페이스 Pod 목록 조회")
-    public ResponseDto<List<PodSimpleDto>> getPods(
+    public ResponseDto<PodListDto> getPods(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
         Long clusterId
@@ -59,7 +58,7 @@ public class WorkloadController {
 
     @GetMapping("/{cluster_id}/workload/pods/namespace")
     @Operation(summary = "특정 네임스페이스 Pod 목록 조회", description = "특정 네임스페이스 Pod 목록 조회")
-    public ResponseDto<List<PodSimpleDto>> getPodsByNamespace(
+    public ResponseDto<PodListDto> getPodsByNamespace(
         @UserId Long userId,
         @RequestParam(name = "namespace")
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
@@ -222,15 +221,5 @@ public class WorkloadController {
         Long clusterId
     ) {
         return ResponseDto.ok(podService.getJobListByNamespace(userId, namespace, clusterId));
-    }
-
-    @GetMapping("/{clusterId}/resource-usage")
-    public ResponseDto<?> getResourceUsage(
-        @PathVariable(name = "clusterId")
-        Long clusterId,
-        @RequestParam(name = "podName")
-        String podName
-    ) {
-        return ResponseDto.ok(podService.getUsage(clusterId, podName));
     }
 }

@@ -30,34 +30,15 @@ public record PodSimpleDto(
     String status,
     @Schema(description = "Pod 재시작 횟수", example = "0")
     List<Integer> restartCount,
-    @Schema(description = "Pod cpu 사용량", example = "1.00m")
-    String cpuUsage,
-    @Schema(description = "Pod 메모리 사용량", example = "80.90Mi")
-    String memoryUsage,
+    @Schema(description = "Pod 자원 사용량")
+    UsageDto usage,
     @Schema(description = "Pod 생성 시간", example = "1d")
     String age,
     @Schema(description = "Pod 생성 일시", example = "2021-12-01 오후 12:00:00")
     String creationDateTime
 ) {
 
-    public static PodSimpleDto fromEntity(V1Pod pod) {
-        return PodSimpleDto.builder()
-            .name(Objects.requireNonNull(pod.getMetadata()).getName())
-            .namespace(pod.getMetadata().getNamespace())
-            .images(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
-            .labels(pod.getMetadata().getLabels())
-            .restartCount(pod.getStatus().getContainerStatuses().stream()
-                .map(V1ContainerStatus::getRestartCount).toList())
-            .node(pod.getSpec().getNodeName())
-            .age(getAge(
-                Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
-            .status(pod.getStatus().getPhase())
-            .creationDateTime(pod.getMetadata().getCreationTimestamp().toLocalDateTime().format(
-                DATE_TIME_FORMATTER))
-            .build();
-    }
-
-    public static PodSimpleDto fromEntity(V1Pod pod, PodMetrics podMetrics) {
+    public static PodSimpleDto fromEntity(V1Pod pod, PodMetrics podMetrics, String time) {
         return PodSimpleDto.builder()
             .name(pod.getMetadata().getName())
             .namespace(pod.getMetadata().getNamespace())
@@ -66,6 +47,7 @@ public record PodSimpleDto(
             .restartCount(pod.getStatus().getContainerStatuses().stream()
                 .map(V1ContainerStatus::getRestartCount).toList())
             .node(pod.getSpec().getNodeName())
+            .usage(UsageDto.fromEntity(podMetrics, time))
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())
