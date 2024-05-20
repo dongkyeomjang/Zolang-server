@@ -21,9 +21,9 @@ public record MountDto(
         V1Volume volume;
         String sourceType = null;
         String sourceName = null;
-        for (int i = 0; i < volumes.size(); i++) {
-            if (volumes.get(i).getName().equals(volumeMounts.getName())) {
-                volume = volumes.get(i);
+        for (V1Volume v1Volume : volumes) {
+            if (v1Volume.getName().equals(volumeMounts.getName())) {
+                volume = v1Volume;
                 if (volume.getPersistentVolumeClaim() != null) {
                     sourceType = "PersistentVolumeClaim";
                     sourceName = volume.getPersistentVolumeClaim().getClaimName();
@@ -54,7 +54,7 @@ public record MountDto(
                     sourceType = "DownwardAPI";
                 } else if (volume.getFc() != null) {
                     sourceType = "FC";
-                    sourceName = volume.getFc().getTargetWWNs().toString();
+                    sourceName = volume.getFc().getFsType();
                 } else if (volume.getFlexVolume() != null) {
                     sourceType = "FlexVolume";
                     sourceName = volume.getFlexVolume().getDriver();

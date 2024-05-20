@@ -152,10 +152,12 @@ public class WorkloadService {
                 ownerReference.getName(), namespace);
             List<PodPersistentVolumeClaimDto> pvcDtoList = new ArrayList<>();
             List<V1Volume> volumes = pod.getSpec().getVolumes();
-            for (V1Volume v : volumes) {
-                if (v.getPersistentVolumeClaim() != null) {
-                    pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
-                        v.getPersistentVolumeClaim().getClaimName(), namespace));
+            if (volumes != null) {
+                for (V1Volume v : volumes) {
+                    if (v.getPersistentVolumeClaim() != null) {
+                        pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
+                            v.getPersistentVolumeClaim().getClaimName(), namespace));
+                    }
                 }
             }
             return PodDetailDto.fromEntity(pod,
@@ -311,7 +313,7 @@ public class WorkloadService {
     public List<String> getName(Long userId,
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
-        List<String> namespaceList = new ArrayList<>();
+        List<String> namespaceList;
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             namespaceList = coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
