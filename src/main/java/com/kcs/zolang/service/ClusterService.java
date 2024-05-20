@@ -8,20 +8,13 @@ import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
-import com.kcs.zolang.utility.ClusterApiUtil;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -30,10 +23,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class ClusterService {
     private final ClusterRepository clusterRepository;
-    private final ClusterApiUtil clusterApiUtil;
     private final UserRepository userRepository;
-    @Value("${certification.path}")
-    private String basePath;
 
     public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) throws IOException {
         User user = userRepository.findById(userId)
