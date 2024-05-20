@@ -51,5 +51,6 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
                 principal.getUserId(), jwtTokenDto.refreshToken(), true, encryptedAccessToken); // 암호화된 토큰 저장
 
         AuthenticationResponse.makeLoginSuccessResponse(response, jwtTokenDto, jwtUtil.getRefreshExpiration());
+        response.sendRedirect("https://www.zolang.site");
     }
 }
