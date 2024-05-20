@@ -310,20 +310,6 @@ public class WorkloadService {
         }
     }
 
-    public List<String> getName(Long userId,
-        Long clusterId) {
-        monitoringUtil.getV1Api(userId, clusterId);
-        List<String> namespaceList;
-        try {
-            CoreV1Api coreV1Api = new CoreV1Api();
-            namespaceList = coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
-                .map(it -> it.getMetadata().getName()).toList();
-        } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
-        }
-        return namespaceList;
-    }
-
     private PodControlledDto getControlled(String kind, String name, String namespace) {
         AppsV1Api appsV1Api = new AppsV1Api();
         BatchV1Api batchV1Api = new BatchV1Api();
