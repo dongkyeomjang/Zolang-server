@@ -29,7 +29,6 @@ public class ClusterApiUtil {
                         PoolingHttpClientConnectionManagerBuilder.create()
                                 .setSSLSocketFactory(
                                         SSLConnectionSocketFactoryBuilder.create()
-                                                .setSslContext(createSSLContext(cluster.getCertPath()))
                                                 .build())
                                 .build())
                 .build();

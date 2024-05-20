@@ -35,23 +35,19 @@ public class ClusterService {
     @Value("${certification.path}")
     private String basePath;
 
-    public Long registerCluster(Long userId, MultipartFile file, RegisterClusterDto registerClusterDto) throws IOException {
-        InputStream certificateStream = file.getInputStream();
-        String filename = file.getOriginalFilename();
+    public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) throws IOException {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
-        Path certPath = Path.of(basePath, userId.toString()+registerClusterDto.clusterName()+filename);
-        Files.copy(certificateStream, certPath, StandardCopyOption.REPLACE_EXISTING);
+
         return clusterRepository.save(
-                Cluster.builder()
-                        .clusterName(registerClusterDto.clusterName())
-                        .domainUrl(registerClusterDto.domainUrl())
-                        .secretToken(registerClusterDto.secretToken())
-                        .user(user)
-                        .version(registerClusterDto.version())
-                        .certPath(certPath.toString())
-                        .build()
-        )
+                        Cluster.builder()
+                                .clusterName(registerClusterDto.clusterName())
+                                .domainUrl(registerClusterDto.domainUrl())
+                                .secretToken(registerClusterDto.secretToken())
+                                .user(user)
+                                .version(registerClusterDto.version())
+                                .build()
+                )
                 .getId();
     }
     public List<ClusterListDto> getClusters(Long userId) {
@@ -64,7 +60,7 @@ public class ClusterService {
         // 클러스터의 상태를 가져오는 메소드. 클러스터의 상태는 DB에 저장되어있지 않고, 실시간으로 가져와야함.
         Cluster cluster = clusterRepository.findById(clusterId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        RestTemplate restTemplate = clusterApiUtil.createRestTemplate(cluster);
+        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -97,7 +93,7 @@ public class ClusterService {
         // 클러스터에 등록된 노드 목록을 가져오는 메소드. 클러스터의 노드 목록은 DB에 저장되어있지 않고, 실시간으로 가져와야함.
         Cluster cluster = clusterRepository.findById(clusterId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        RestTemplate restTemplate = clusterApiUtil.createRestTemplate(cluster);
+        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -149,7 +145,7 @@ public class ClusterService {
         // 특정 클러스터의 노드 상세 정보를 가져오는 메소드.
         Cluster cluster = clusterRepository.findById(clusterId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        RestTemplate restTemplate = clusterApiUtil.createRestTemplate(cluster);
+        RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -186,3 +182,4 @@ public class ClusterService {
         return Map.of();
     }
 }
+

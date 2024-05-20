@@ -19,6 +19,6 @@ public record UserUrlTokenDto(
         return UserUrlTokenDto.builder()
             .url(cluster.getDomainUrl())
             .token(cluster.getSecretToken())
-            .caCert(cluster.getCertPath()).build();
+            .build();
     }
 }
