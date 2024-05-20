@@ -15,9 +15,10 @@ public class CorsConfig {
         CorsConfiguration corsConfig = new CorsConfiguration();
 
         corsConfig.setAllowCredentials(true);
-        corsConfig.setAllowedOrigins(List.of("http://localhost:3000", "http://localhost:8080", "http://localhost:8000"));
-        corsConfig.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE","OPTIONS"));
+        corsConfig.setAllowedOrigins(List.of("http://localhost:8080", "http://localhost:5173", "https://zolang.site"));
+        corsConfig.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"));
         corsConfig.setAllowedHeaders(List.of("Authorization", "Content-Type"));
+        corsConfig.setAllowCredentials(true);
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         source.registerCorsConfiguration("/**", corsConfig);
 
