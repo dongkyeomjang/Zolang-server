@@ -16,6 +16,8 @@ public class Constants {
             "/api/v1/no-auth/**",
             "/api/v1/oauth2/sign-up",
             "/api/v1/auth/sign-up",
+            "/api/v1/users/github/**",
+            "/api/v1/users/github",
             "/api/v1/auth/login",
             "/oauth2/authorization/github",
             "/login/oauth2/code/github",
