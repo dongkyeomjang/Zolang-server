@@ -98,8 +98,8 @@ public class MonitoringUtil {
         return client;
     }
 
-    //매분 10초마다
-    @Scheduled(cron = "10 * * * * *")
+    //매분마다
+    @Scheduled(cron = "0 * * * * *")
     public void saveResourceUsage() throws ApiException, KubectlException {
         List<User> users = userRepository.findAll();
         int h = LocalDateTime.now().getHour();
