@@ -9,9 +9,9 @@ public record CommitDto(
         String fileName,
         @JsonProperty("content") @Schema(description = "커밋할 내용", required = true)
         String content,
-        @JsonProperty("commiter_name") @Schema(description = "커밋한 사람 이름", required = true)
-        String commiterName,
-        @JsonProperty("commiter_email") @Schema(description = "커밋한 사람 이메일", required = true)
-        String commiterEmail
+        @JsonProperty("committer_name") @Schema(description = "커밋한 사람 이름", required = true)
+        String committerName,
+        @JsonProperty("committer_email") @Schema(description = "커밋한 사람 이메일", required = true)
+        String committerEmail
 ) {
 }

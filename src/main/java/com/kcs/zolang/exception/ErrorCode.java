@@ -17,7 +17,8 @@ public enum ErrorCode {
     NOT_FOUND_AUTHORIZATION_HEADER(40401, HttpStatus.NOT_FOUND, "Authorization 헤더가 존재하지 않습니다."),
     NOT_FOUND_USER(40401, HttpStatus.NOT_FOUND, "해당 사용자가 존재하지 않습니다."),
     NOT_FOUND_CLUSTER(40402, HttpStatus.NOT_FOUND, "해당 클러스터가 존재하지 않습니다."),
-    NOT_FOUND_CONDITION(40403, HttpStatus.NOT_FOUND, "해당 조건에 맞는 데이터가 존재하지 않습니다."),
+    NOT_FOUND_REPOSITORY(40403, HttpStatus.NOT_FOUND, "해당 저장소가 존재하지 않습니다."),
+    NOT_FOUND_CONDITION(40404, HttpStatus.NOT_FOUND, "해당 조건에 맞는 데이터가 존재하지 않습니다."),
 
     // Invalid Argument Error
     MISSING_REQUEST_PARAMETER(40000, HttpStatus.BAD_REQUEST, "필수 요청 파라미터가 누락되었습니다."),
@@ -52,7 +53,8 @@ public enum ErrorCode {
     UPLOAD_FILE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 업로드에 실패하였습니다."),
     FILE_STORAGE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패하였습니다."),
     CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
-    API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다.");
+    API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다."),
+    FAILED_CREATE_WEBHOOK(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;
