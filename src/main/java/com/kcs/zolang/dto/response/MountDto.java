@@ -9,11 +9,17 @@ import lombok.Builder;
 @Builder
 @Schema(name = "MountDto", description = "마운트 정보 Dto")
 public record MountDto(
+    @Schema(description = "마운트 이름", example = "mount-name")
     String name,
+    @Schema(description = "읽기 전용 여부", example = "true")
     boolean readOnly,
+    @Schema(description = "마운트 경로", example = "/path")
     String mountPath,
+    @Schema(description = "서브 경로", example = "/sub-path")
     String subPath,
+    @Schema(description = "소스 타입", example = "source-type")
     String sourceType,
+    @Schema(description = "소스 이름", example = "source-name")
     String sourceName
 ) {
 
