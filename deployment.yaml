@@ -15,5 +15,6 @@ spec:
       containers:
         - name: zolang
           image: 058264295714.dkr.ecr.ap-northeast-2.amazonaws.com/zolang:latest
+          imagePullPolicy: Always
           ports:
             - containerPort: 8080
