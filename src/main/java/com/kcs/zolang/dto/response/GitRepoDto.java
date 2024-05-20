@@ -5,7 +5,6 @@ import lombok.Builder;
 @Builder
 public record GitRepoDto(
         String name,
-        String branchesUrl,
-        String commitsUrl
+        String branchesUrl
 ) {
 }

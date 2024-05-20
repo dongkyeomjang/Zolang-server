@@ -21,7 +21,7 @@ public class Build {
 
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "repository_id", nullable = false)
-    private Repository repository;
+    private CICD CICD;
 
     @Column(name = "repository_number", nullable = false)
     private Integer repositoryNumber;
@@ -37,8 +37,8 @@ public class Build {
     private LocalDateTime createdAt;
 
     @Builder
-    public Build(Repository repository, Integer repositoryNumber, Integer buildNumber, Integer buildStatus) {
-        this.repository = repository;
+    public Build(CICD CICD, Integer repositoryNumber, Integer buildNumber, Integer buildStatus) {
+        this.CICD = CICD;
         this.repositoryNumber = repositoryNumber;
         this.buildNumber = buildNumber;
         this.buildStatus = buildStatus;

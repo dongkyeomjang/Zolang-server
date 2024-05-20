@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: zolang-deployment
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: zolang
+  template:
+    metadata:
+      labels:
+        app: zolang
+    spec:
+      containers:
+        - name: zolang
+          image: 058264295714.dkr.ecr.ap-northeast-2.amazonaws.com/zolang:latest
+          ports:
+            - containerPort: 8080
