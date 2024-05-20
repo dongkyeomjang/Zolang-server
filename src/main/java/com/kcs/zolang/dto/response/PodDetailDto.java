@@ -11,7 +11,7 @@ public record PodDetailDto(
     @Schema(description = "Pod 지난 사용량 리스트")
     List<UsageDto> metrics,
     @Schema(description = "Pod 메타데이터")
-    PodMetadataDto metadata,
+    CommonMetadataDto metadata,
     @Schema(description = "Pod 리소스 정보")
     PodResourceDto resource,
     @Schema(description = "Pod 조건")
@@ -23,12 +23,12 @@ public record PodDetailDto(
     List<PodPersistentVolumeClaimDto> persistentVolumeClaims
 ) {
 
-    public static PodDetailDto fromEntity(V1Pod pod, String age,
-        PodControlledDto controlledDtoList, List<PodPersistentVolumeClaimDto> pvcDtoList,
+    public static PodDetailDto fromEntity(V1Pod pod, PodControlledDto controlledDtoList,
+        List<PodPersistentVolumeClaimDto> pvcDtoList,
         List<UsageDto> metrics) {
         return PodDetailDto.builder()
             .metrics(metrics)
-            .metadata(PodMetadataDto.fromEntity(pod, age))
+            .metadata(CommonMetadataDto.fromEntity(pod))
             .resource(PodResourceDto.fromEntity(pod))
             .conditions(
                 pod.getStatus().getConditions().stream().map(PodConditionsDto::fromEntity).toList())
