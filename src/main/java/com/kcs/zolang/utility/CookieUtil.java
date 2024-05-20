@@ -28,11 +28,11 @@ public class CookieUtil {
     public static void addCookie(HttpServletResponse response, String name, String value) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .path("/")
-                .domain("localhost") // 도메인 설정, 필요에 따라 생략 가능
+                .domain(".zolang.site") // 도메인 설정, 필요에 따라 생략 가능
                 .maxAge(60 * 60 * 24 * 30) // 30일 설정
-                .httpOnly(false) // HttpOnly 설정
-                .sameSite("Strict") // 크로스 사이트 요청 허용
-                .secure(false) // HTTPS를 통해서만 쿠키 전송
+                .httpOnly(true) // HttpOnly 설정
+                .sameSite("Lax") // 크로스 사이트 요청 허용
+                .secure(true) // HTTPS를 통해서만 쿠키 전송
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
@@ -40,11 +40,11 @@ public class CookieUtil {
     public static void addSecureCookie(HttpServletResponse response, String name, String value, Integer maxAge) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .path("/")
-                .domain("localhost") // 도메인 설정, 필요에 따라 생략 가능
+                .domain(".zolang.site") // 도메인 설정, 필요에 따라 생략 가능
                 .maxAge(maxAge)
-                .httpOnly(false) // HttpOnly 설정
-                .sameSite("Strict") // 크로스 사이트 요청 허용
-                .secure(false) // HTTPS를 통해서만 쿠키 전송
+                .httpOnly(true) // HttpOnly 설정
+                .sameSite("Lax") // 크로스 사이트 요청 허용
+                .secure(true) // HTTPS를 통해서만 쿠키 전송
                 .build();
         response.addHeader("Set-Cookie", cookie.toString());
     }
@@ -60,11 +60,11 @@ public class CookieUtil {
             if (cookie.getName().equals(name)) {
                 ResponseCookie deleteCookie = ResponseCookie.from(name,null)
                         .path("/")
-                        .domain("localhost") // 도메인 설정, 필요에 따라 생략 가능
+                        .domain(".zolang.site") // 도메인 설정, 필요에 따라 생략 가능
                         .maxAge(0)
-                        .httpOnly(false) // HttpOnly 설정
-                        .sameSite("Strict") // 크로스 사이트 요청 허용
-                        .secure(false) // HTTPS를 통해서만 쿠키 전송
+                        .httpOnly(true) // HttpOnly 설정
+                        .sameSite("Lax") // 크로스 사이트 요청 허용
+                        .secure(true) // HTTPS를 통해서만 쿠키 전송
                         .build();
                 response.addHeader("Set-Cookie", deleteCookie.toString());
             }
