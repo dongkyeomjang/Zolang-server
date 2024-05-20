@@ -73,6 +73,12 @@ dependencies {
     // https://mvnrepository.com/artifact/io.kubernetes/client-java-extended
     implementation 'io.kubernetes:client-java-extended:20.0.1'
 
+    // https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-data-redis
+    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-redis', version: '3.2.4'
+
+    // https://mvnrepository.com/artifact/org.springframework.session/spring-session-data-redis
+    implementation group: 'org.springframework.session', name: 'spring-session-data-redis', version: '3.2.2'
+
 }
 
 tasks.named('test') {
