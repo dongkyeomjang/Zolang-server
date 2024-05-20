@@ -70,6 +70,7 @@ dependencies {
     // Jasypt
     implementation group: 'org.jasypt', name: 'jasypt', version: '1.9.2'
 
+    //kubernetes client
     // https://mvnrepository.com/artifact/io.kubernetes/client-java-extended
     implementation 'io.kubernetes:client-java-extended:20.0.1'
 

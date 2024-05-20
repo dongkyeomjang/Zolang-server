@@ -54,7 +54,8 @@ public enum ErrorCode {
     FILE_STORAGE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패하였습니다."),
     CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
     API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다."),
-    FAILED_CREATE_WEBHOOK(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
+    KUBECTL_ERROR(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Kubectl 명령어 실행에 실패하였습니다.");
+    FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;

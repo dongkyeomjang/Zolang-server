@@ -10,15 +10,14 @@ import lombok.Builder;
 public record UserUrlTokenDto(
     @NotEmpty(message = "URL이 없습니다.")
     String url,
-    @NotEmpty (message = "Token이 없습니다.")
-    String token,
-    @NotEmpty (message = "caCert가 없습니다.")
-    String caCert
+    @NotEmpty(message = "Token이 없습니다.")
+    String token
 ) {
+
     public static UserUrlTokenDto fromEntity(Cluster cluster) {
         return UserUrlTokenDto.builder()
             .url(cluster.getDomainUrl())
             .token(cluster.getSecretToken())
-            .caCert(cluster.getCertPath()).build();
+            .build();
     }
 }
