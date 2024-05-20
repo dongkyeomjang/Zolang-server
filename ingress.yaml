@@ -19,10 +19,10 @@ spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - zolang.site
+        - kcs.zolang.site
       secretName: zolang-tls
   rules:
-    - host: zolang.site
+    - host: kcs.zolang.site
       http:
         paths:
           - path: /login/oauth2/code/github
