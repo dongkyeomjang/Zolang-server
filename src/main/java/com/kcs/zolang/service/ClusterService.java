@@ -8,22 +8,17 @@ import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.HttpEntity;
-import org.springframework.http.HttpHeaders;
-import org.springframework.http.HttpMethod;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.MediaType;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.*;
 import org.springframework.stereotype.Service;
 import org.springframework.web.client.RestTemplate;
 import org.springframework.web.util.UriComponentsBuilder;
+import java.io.IOException;
 
 @Service
 @RequiredArgsConstructor
@@ -31,11 +26,8 @@ public class ClusterService {
 
     private final ClusterRepository clusterRepository;
     private final UserRepository userRepository;
-    @Value("${certification.path}")
-    private String basePath;
 
-    public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto)
-        throws IOException {
+    public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) {
         User user = userRepository.findById(userId)
             .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
 
@@ -57,7 +49,7 @@ public class ClusterService {
             .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
     }
 
-    public Boolean getClusterStatus(Long clusterId) throws Exception {
+    public Boolean getClusterStatus(Long clusterId) {
         // 클러스터의 상태를 가져오는 메소드. 클러스터의 상태는 DB에 저장되어있지 않고, 실시간으로 가져와야함.
         Cluster cluster = clusterRepository.findById(clusterId)
             .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
