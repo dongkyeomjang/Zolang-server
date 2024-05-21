@@ -92,6 +92,19 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDeploymentList(userId, clusterId));
     }
 
+    @GetMapping("/{cluster_id}/workload/deployments/{deploymentName}")
+    @Operation(summary = "Deployment 상세 조회", description = "특정 Deployment 상세 조회")
+    public ResponseDto<?> getDeploymentDetail(
+        @UserId Long userId,
+        @PathVariable(name = "deploymentName") String name,
+        @RequestParam(name = "namespace")
+        String namespace,
+        @PathVariable(name = "cluster_id")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getDeploymentDetail(userId, name, namespace, clusterId));
+    }
+
     @GetMapping("/{cluster_id}/workload/deployments/namespace")
     @Operation(summary = "특정 네임스페이스 Deployment 목록 조회", description = "특정 네임스페이스 Deployment 목록 조회")
     public ResponseDto<?> getDeploymentsByNamespace(
