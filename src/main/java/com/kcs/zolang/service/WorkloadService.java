@@ -1,10 +1,10 @@
 package com.kcs.zolang.service;
 
-import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
+import com.kcs.zolang.dto.response.DeploymentDetailDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
 import com.kcs.zolang.dto.response.PodListDto;
@@ -36,7 +36,6 @@ import io.kubernetes.client.openapi.models.V1Volume;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -174,10 +173,7 @@ public class WorkloadService {
                         v.getPersistentVolumeClaim().getClaimName(), namespace));
                 }
             }
-            return PodDetailDto.fromEntity(pod,
-                getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
-                    .toLocalDateTime()),
-                controlledDto, pvcDtoList, podUsage);
+            return PodDetailDto.fromEntity(pod, controlledDto, pvcDtoList, podUsage);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -189,6 +185,18 @@ public class WorkloadService {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listDeploymentForAllNamespaces().execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public DeploymentDetailDto getDeploymentDetail(Long userId, String name, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            V1Deployment deployment = appsV1Api.readNamespacedDeployment(name, namespace).execute();
+            return DeploymentDetailDto.fromEntity(deployment);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
