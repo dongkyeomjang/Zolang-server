@@ -142,6 +142,19 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDaemonSetListByNamespace(userId, namespace, clusterId));
     }
 
+    @GetMapping("/{cluster_id}/workload/daemonsets/{daemonSetName}")
+    @Operation(summary = "DaemonSet 상세 조회", description = "특정 DaemonSet 상세 조회")
+    public ResponseDto<?> getDaemonSetDetail(
+        @UserId Long userId,
+        @PathVariable(name = "daemonSetName") String name,
+        @RequestParam(name = "namespace")
+        String namespace,
+        @PathVariable(name = "cluster_id")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getDaemonSetDetail(userId, name, namespace, clusterId));
+    }
+
     @GetMapping("/{cluster_id}/workload/replicas")
     @Operation(summary = "ReplicaSet 목록 조회", description = "모든 네임스페이스 ReplicaSet 목록 조회")
     public ResponseDto<?> getReplicaSets(

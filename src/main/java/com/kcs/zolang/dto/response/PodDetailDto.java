@@ -28,7 +28,8 @@ public record PodDetailDto(
         List<UsageDto> metrics) {
         return PodDetailDto.builder()
             .metrics(metrics)
-            .metadata(CommonMetadataDto.fromEntity(pod))
+            .metadata(
+                pod.getMetadata() == null ? null : CommonMetadataDto.fromEntity(pod.getMetadata()))
             .resource(PodResourceDto.fromEntity(pod))
             .conditions(
                 pod.getStatus().getConditions().stream().map(PodConditionsDto::fromEntity).toList())

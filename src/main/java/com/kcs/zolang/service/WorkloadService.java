@@ -4,6 +4,7 @@ import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
+import com.kcs.zolang.dto.response.DemonSetDetailDto;
 import com.kcs.zolang.dto.response.DeploymentDetailDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
@@ -104,7 +105,6 @@ public class WorkloadService {
     public PodListDto getPodList(Long userId, Long clusterId) {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
         int m = LocalDateTime.now().getMinute();
-        String time = getTime(m);
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1NamespaceList namespaceList = coreV1Api.listNamespace().execute();
@@ -114,7 +114,7 @@ public class WorkloadService {
                     PodMetrics.class).apiClient(client)
                     .namespace(ns.getMetadata().getName()).execute()
                     .stream().map(it -> it == null ? null
-                        : PodSimpleDto.fromEntity(it.getLeft(), it.getRight(), time,
+                        : PodSimpleDto.fromEntity(it.getLeft(), it.getRight(),
                             getPodMetrics(clusterId, it.getLeft().getMetadata().getName(), m)))
                     .toList());
             }
@@ -122,7 +122,7 @@ public class WorkloadService {
             for (int i = 13; i > 0; i--) {
                 keys.add("cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m - i)) % 60));
             }
-            List<UsageDto> jsonData = getTotalUsage(keys);
+            List<UsageDto> jsonData = getUsage(keys);
             //모든 네임스페이스의 pod list
             return PodListDto.fromEntity(jsonData, podSimpleDtoList);
         } catch (ApiException e) {
@@ -147,7 +147,7 @@ public class WorkloadService {
                 keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
                     (60 + (m - i)) % 60));
             }
-            List<UsageDto> totalUsage = getTotalUsage(keys);
+            List<UsageDto> totalUsage = getUsage(keys);
             //특정 네임스페이스의 pod list
             return PodListDto.fromEntity(totalUsage, podUsage);
         } catch (KubectlException e) {
@@ -232,6 +232,36 @@ public class WorkloadService {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listNamespacedDaemonSet(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public DemonSetDetailDto getDaemonSetDetail(Long userId, String name, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            CoreV1Api coreV1Api = new CoreV1Api();
+            AppsV1Api appsV1Api = new AppsV1Api();
+            V1DaemonSet daemonSet = appsV1Api.readNamespacedDaemonSet(name, namespace).execute();
+            List<V1Pod> list = coreV1Api.listNamespacedPod(daemonSet.getMetadata().getNamespace())
+                .execute().getItems();
+            List<V1Pod> daemonSetPods = new ArrayList<>();
+            for (V1Pod item : list) {
+                if (item.getMetadata().getOwnerReferences() != null) {
+                    V1OwnerReference owner = item.getMetadata().getOwnerReferences().get(0);
+                    {
+                        if (owner.getKind().equals("DaemonSet") && owner.getName()
+                            .equals(daemonSet.getMetadata().getName())) {
+                            daemonSetPods.add(item);
+                        }
+                    }
+                }
+            }
+            return DemonSetDetailDto.fromEntity(daemonSet,
+                getPodSimpleDtoList(clusterId, daemonSetPods,
+                    LocalDateTime.now().minusSeconds(10).getMinute()),
+                null /*TODO: serviceDto 나오면 작성*/);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -433,7 +463,7 @@ public class WorkloadService {
         }
     }
 
-    private List<UsageDto> getTotalUsage(List<String> keys) {
+    private List<UsageDto> getUsage(List<String> keys) {
         List<UsageDto> usageDtoList = new ArrayList<>();
         for (String key : keys) {
             usageDtoList.add(redisTemplate.opsForValue().get(key) == null ? null
@@ -447,7 +477,19 @@ public class WorkloadService {
         for (int i = 13; i > 0; i--) {
             keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
         }
-        return getTotalUsage(keys);
+        return getUsage(keys);
+    }
+
+    private List<PodSimpleDto> getPodSimpleDtoList(Long clusterId, List<V1Pod> podList, int m) {
+        List<PodSimpleDto> podSimpleDtoList = new ArrayList<>();
+        String key;
+        for (V1Pod p : podList) {
+            key = "cluster-usage:" + clusterId + ":" + p.getMetadata().getName() + ":" + m;
+            podSimpleDtoList.add(
+                PodSimpleDto.fromEntity(p, getUsage(List.of(key)).get(0),
+                    getPodMetrics(clusterId, p.getMetadata().getName(), m)));
+        }
+        return podSimpleDtoList;
     }
 
     private String getTime(int m) {
