@@ -17,6 +17,7 @@ public enum ErrorCode {
     NOT_FOUND_AUTHORIZATION_HEADER(40401, HttpStatus.NOT_FOUND, "Authorization 헤더가 존재하지 않습니다."),
     NOT_FOUND_USER(40401, HttpStatus.NOT_FOUND, "해당 사용자가 존재하지 않습니다."),
     NOT_FOUND_CLUSTER(40402, HttpStatus.NOT_FOUND, "해당 클러스터가 존재하지 않습니다."),
+    NOT_FOUND_NETWORK(40402, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
     NOT_FOUND_REPOSITORY(40403, HttpStatus.NOT_FOUND, "해당 저장소가 존재하지 않습니다."),
     NOT_FOUND_CONDITION(40404, HttpStatus.NOT_FOUND, "해당 조건에 맞는 데이터가 존재하지 않습니다."),
 
