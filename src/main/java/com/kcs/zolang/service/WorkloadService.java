@@ -1,17 +1,15 @@
 package com.kcs.zolang.service;
 
-import static com.kcs.zolang.utility.MonitoringUtil.getAge;
-import static io.kubernetes.client.extended.kubectl.Kubectl.top;
-
+import com.kcs.zolang.dto.response.CommonControllerDetailDto;
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
-import com.kcs.zolang.dto.response.DemonSetDetailDto;
 import com.kcs.zolang.dto.response.DeploymentDetailDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
 import com.kcs.zolang.dto.response.PodListDto;
 import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
+import com.kcs.zolang.dto.response.ServiceSimpleDto;
 import com.kcs.zolang.dto.response.UsageDto;
 import com.kcs.zolang.dto.response.WorkloadOverviewDto;
 import com.kcs.zolang.exception.CommonException;
@@ -28,6 +26,7 @@ import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
+import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.kubernetes.client.openapi.models.V1Volume;
 import java.time.LocalDateTime;
@@ -162,10 +161,7 @@ public class WorkloadService {
                     }
                 }
             }
-            return PodDetailDto.fromEntity(pod,
-                getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
-                    .toLocalDateTime()),
-                controlledDto, pvcDtoList, podUsage, volumes);
+            return PodDetailDto.fromEntity(pod, controlledDto, pvcDtoList, podUsage, volumes);
         } catch (ApiException e) {
             if (e.getCode() == 404) {
                 throw new CommonException(ErrorCode.NOT_FOUND_POD);
@@ -193,6 +189,9 @@ public class WorkloadService {
             V1Deployment deployment = appsV1Api.readNamespacedDeployment(name, namespace).execute();
             return DeploymentDetailDto.fromEntity(deployment);
         } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new CommonException(ErrorCode.NOT_FOUND_DEPLOYMENT);
+            }
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
@@ -232,7 +231,7 @@ public class WorkloadService {
         }
     }
 
-    public DemonSetDetailDto getDaemonSetDetail(Long userId, String name, String namespace,
+    public CommonControllerDetailDto getDaemonSetDetail(Long userId, String name, String namespace,
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
@@ -253,11 +252,18 @@ public class WorkloadService {
                     }
                 }
             }
-            return DemonSetDetailDto.fromEntity(daemonSet,
-                getPodSimpleDtoList(clusterId, daemonSetPods,
-                    LocalDateTime.now().minusSeconds(10).getMinute()),
-                null /*TODO: serviceDto 나오면 작성*/);
+            String kind = "DaemonSet";
+            String controllerName = daemonSet.getMetadata().getName();
+            String namespaceName = daemonSet.getMetadata().getNamespace();
+            List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
+                namespaceName, kind);
+            List<ServiceSimpleDto> serviceList = getControllerServiceList(controllerName,
+                namespaceName, kind);
+            return CommonControllerDetailDto.fromEntity(daemonSet, podList, serviceList);
         } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new CommonException(ErrorCode.NOT_FOUND_DEMON_SET);
+            }
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
@@ -285,6 +291,28 @@ public class WorkloadService {
         }
     }
 
+    public CommonControllerDetailDto getReplicaSetDetail(Long userId, String name, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            V1ReplicaSet replicaSet = appsV1Api.readNamespacedReplicaSet(name, namespace).execute();
+            String kind = "ReplicaSet";
+            String controllerName = replicaSet.getMetadata().getName();
+            String namespaceName = replicaSet.getMetadata().getNamespace();
+            List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
+                namespaceName, kind);
+            List<ServiceSimpleDto> serviceList = getControllerServiceList(controllerName,
+                namespaceName, kind);
+            return CommonControllerDetailDto.fromEntity(replicaSet, podList, serviceList);
+        } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new CommonException(ErrorCode.NOT_FOUND_REPLICA_SET);
+            }
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
     public List<CommonControllerDto> getStatefulSetList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
@@ -304,6 +332,25 @@ public class WorkloadService {
             return appsV1Api.listNamespacedStatefulSet(namespace).execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
         } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public CommonControllerDetailDto getStatefulSetDetail(Long userId, String name,
+        String namespace, Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            V1StatefulSet statefulSet = appsV1Api.readNamespacedStatefulSet(name, namespace)
+                .execute();
+            List<PodSimpleDto> pods = getControllerPodList(clusterId,
+                statefulSet.getMetadata().getName(), statefulSet.getMetadata().getNamespace(),
+                statefulSet.getKind());
+            return CommonControllerDetailDto.fromEntity(statefulSet, pods);
+        } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new CommonException(ErrorCode.NOT_FOUND_STATEFUL_SET);
+            }
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
@@ -485,6 +532,45 @@ public class WorkloadService {
                     getPodMetrics(clusterId, p.getMetadata().getName(), m)));
         }
         return podSimpleDtoList;
+    }
+
+    private List<PodSimpleDto> getControllerPodList(Long clusterId, String name, String namespace,
+        String kind) {
+        CoreV1Api coreV1Api = new CoreV1Api();
+        List<V1Pod> pods = new ArrayList<>();
+        int m = LocalDateTime.now().minusSeconds(10).getMinute();
+        try {
+            List<V1Pod> podList = coreV1Api.listNamespacedPod(namespace).execute().getItems();
+            for (V1Pod item : podList) {
+                if (item.getMetadata().getOwnerReferences() != null) {
+                    V1OwnerReference owner = item.getMetadata().getOwnerReferences().get(0);
+                    if (owner.getKind().equalsIgnoreCase(kind) && owner.getName().equals(name)) {
+                        pods.add(item);
+                    }
+                }
+            }
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+        return getPodSimpleDtoList(clusterId, pods, m);
+    }
+
+    private List<ServiceSimpleDto> getControllerServiceList(String name, String namespace,
+        String kind) {
+        CoreV1Api coreV1Api = new CoreV1Api();
+        List<V1Service> services = new ArrayList<>();
+        try {
+            List<V1Service> serviceList = coreV1Api.listNamespacedService(namespace).execute()
+                .getItems();
+            for (V1Service item : serviceList) {
+                if (item.getMetadata().getName().equals(name.split("-")[0])) {
+                    services.add(item);
+                }
+            }
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+        return services.stream().map(ServiceSimpleDto::fromEntity).toList();
     }
 
     private String getTime(int m) {

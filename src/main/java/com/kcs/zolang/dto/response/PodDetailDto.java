@@ -26,7 +26,7 @@ public record PodDetailDto(
     ContainerDto containers
 ) {
 
-    public static PodDetailDto fromEntity(V1Pod pod, String age,
+    public static PodDetailDto fromEntity(V1Pod pod,
         PodControlledDto controlledDtoList, List<PodPersistentVolumeClaimDto> pvcDtoList,
         List<UsageDto> metrics, List<V1Volume> volumes) {
         return PodDetailDto.builder()

@@ -142,7 +142,7 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDaemonSetListByNamespace(userId, namespace, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/daemonsets/{daemonSetName}")
+    @GetMapping("/{cluster_id}/workload/daemons/{daemonSetName}")
     @Operation(summary = "DaemonSet 상세 조회", description = "특정 DaemonSet 상세 조회")
     public ResponseDto<?> getDaemonSetDetail(
         @UserId Long userId,
@@ -179,6 +179,19 @@ public class WorkloadController {
             podService.getReplicaSetListByNamespace(userId, namespace, clusterId));
     }
 
+    @GetMapping("/{cluster_id}/workload/replicas/{replicaSetName}")
+    @Operation(summary = "ReplicaSet 상세 조회", description = "특정 ReplicaSet 상세 조회")
+    public ResponseDto<?> getReplicaSetDetail(
+        @UserId Long userId,
+        @PathVariable(name = "replicaSetName") String name,
+        @RequestParam(name = "namespace")
+        String namespace,
+        @PathVariable(name = "cluster_id")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getReplicaSetDetail(userId, name, namespace, clusterId));
+    }
+
     @GetMapping("/{cluster_id}/workload/statefuls")
     @Operation(summary = "StatefulSet 목록 조회", description = "모든 네임스페이스 StatefulSet 목록 조회")
     public ResponseDto<?> getStatefulSets(
@@ -201,6 +214,19 @@ public class WorkloadController {
     ) {
         return ResponseDto.ok(
             podService.getStatefulSetListByNamespace(userId, namespace, clusterId));
+    }
+
+    @GetMapping("/{cluster_id}/workload/statefuls/{statefulSetName}")
+    @Operation(summary = "StatefulSet 상세 조회", description = "특정 StatefulSet 상세 조회")
+    public ResponseDto<?> getStatefulSetDetail(
+        @UserId Long userId,
+        @PathVariable(name = "statefulSetName") String name,
+        @RequestParam(name = "namespace")
+        String namespace,
+        @PathVariable(name = "cluster_id")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getStatefulSetDetail(userId, name, namespace, clusterId));
     }
 
     @GetMapping("/{cluster_id}/workload/cron-jobs")
