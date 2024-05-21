@@ -8,77 +8,79 @@ import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
-import com.kcs.zolang.utility.ClusterApiUtil;
-import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
-import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.multipart.MultipartFile;
-import org.springframework.web.util.UriComponentsBuilder;
-
 import java.io.IOException;
-import java.io.InputStream;
-import java.nio.file.Files;
-import java.nio.file.Path;
-import java.nio.file.StandardCopyOption;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import lombok.RequiredArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.http.HttpEntity;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpMethod;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.stereotype.Service;
+import org.springframework.web.client.RestTemplate;
+import org.springframework.web.util.UriComponentsBuilder;
+
 @Service
 @RequiredArgsConstructor
 public class ClusterService {
+
     private final ClusterRepository clusterRepository;
-    private final ClusterApiUtil clusterApiUtil;
     private final UserRepository userRepository;
     @Value("${certification.path}")
     private String basePath;
 
-    public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) throws IOException {
+    public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto)
+        throws IOException {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
+            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
 
         return clusterRepository.save(
-                        Cluster.builder()
-                                .clusterName(registerClusterDto.clusterName())
-                                .domainUrl(registerClusterDto.domainUrl())
-                                .secretToken(registerClusterDto.secretToken())
-                                .user(user)
-                                .version(registerClusterDto.version())
-                                .build()
-                )
-                .getId();
+                Cluster.builder()
+                    .clusterName(registerClusterDto.clusterName())
+                    .domainUrl(registerClusterDto.domainUrl())
+                    .secretToken(registerClusterDto.secretToken())
+                    .user(user)
+                    .version(registerClusterDto.version())
+                    .build()
+            )
+            .getId();
     }
+
     public List<ClusterListDto> getClusters(Long userId) {
         return clusterRepository.findByUserId(userId).stream() // 사용자가 웹서비스에 등록해놓은 클러스터 리스트 가져와서
-                .map(ClusterListDto::fromEntity) // ClusterListDto로 변환하고
-                .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
+            .map(ClusterListDto::fromEntity) // ClusterListDto로 변환하고
+            .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
     }
 
     public Boolean getClusterStatus(Long clusterId) throws Exception {
         // 클러스터의 상태를 가져오는 메소드. 클러스터의 상태는 DB에 저장되어있지 않고, 실시간으로 가져와야함.
         Cluster cluster = clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(cluster.getDomainUrl())
-                .path("/api/v1/nodes");
+            .path("/api/v1/nodes");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<Map> response = restTemplate.exchange(
-                builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
+            builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
 
-        if(response.getStatusCode() == HttpStatus.OK && response.hasBody()) {
-            Map<String,Object> body = response.getBody();
+        if (response.getStatusCode() == HttpStatus.OK && response.hasBody()) {
+            Map<String, Object> body = response.getBody();
             if (body != null && body.containsKey("items")) {
                 List<Map<String, Object>> items = (List<Map<String, Object>>) body.get("items");
                 for (Map<String, Object> item : items) {
                     Map<String, Object> status = (Map<String, Object>) item.get("status");
-                    Map<String, Object> conditions = ((List<Map<String, Object>>) status.get("conditions")).get(0);
+                    Map<String, Object> conditions = ((List<Map<String, Object>>) status.get(
+                        "conditions")).get(0);
                     if (!"True".equals(conditions.get("status"))) {
                         return false; // 하나라도 비정상 상태면 false 반환
                     }
@@ -89,21 +91,21 @@ public class ClusterService {
         return false;
     }
 
-    public List<Map<String,Object>> getClusterNodes(Long clusterId) throws Exception {
+    public List<Map<String, Object>> getClusterNodes(Long clusterId) throws Exception {
         // 클러스터에 등록된 노드 목록을 가져오는 메소드. 클러스터의 노드 목록은 DB에 저장되어있지 않고, 실시간으로 가져와야함.
         Cluster cluster = clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(cluster.getDomainUrl())
-                .path("/api/v1/nodes");
+            .path("/api/v1/nodes");
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<Map> response = restTemplate.exchange(
-                builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
+            builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
 
         if (response.getStatusCode() == HttpStatus.OK && response.hasBody()) {
             Map<String, Object> body = response.getBody();
@@ -117,9 +119,11 @@ public class ClusterService {
                     Map<String, Object> metadata = (Map<String, Object>) item.get("metadata");
                     Map<String, Object> status = (Map<String, Object>) item.get("status");
                     Map<String, Object> nodeInfo = (Map<String, Object>) status.get("nodeInfo");
-                    Map<String, Object> allocatable = (Map<String, Object>) status.get("allocatable");
+                    Map<String, Object> allocatable = (Map<String, Object>) status.get(
+                        "allocatable");
                     Map<String, Object> capacity = (Map<String, Object>) status.get("capacity");
-                    List<Map<String, Object>> conditions = ((List<Map<String, Object>>) status.get("conditions"));
+                    List<Map<String, Object>> conditions = ((List<Map<String, Object>>) status.get(
+                        "conditions"));
                     allocatableList.put("allocatable-cpu", allocatable.get("cpu"));
                     allocatableList.put("allocatable-memory", allocatable.get("memory"));
                     allocatableList.put("allocatable-pods", allocatable.get("pods"));
@@ -141,21 +145,22 @@ public class ClusterService {
         return List.of();
     }
 
-    public Map<String,Object> getClusterNodeDetail(Long clusterId, String nodeName) throws Exception {
+    public Map<String, Object> getClusterNodeDetail(Long clusterId, String nodeName)
+        throws Exception {
         // 특정 클러스터의 노드 상세 정보를 가져오는 메소드.
         Cluster cluster = clusterRepository.findById(clusterId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
         RestTemplate restTemplate = new RestTemplate();
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "Bearer " + cluster.getSecretToken());
         headers.setContentType(MediaType.APPLICATION_JSON);
 
         UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(cluster.getDomainUrl())
-                .path("/api/v1/nodes/" + nodeName);
+            .path("/api/v1/nodes/" + nodeName);
 
         HttpEntity<String> entity = new HttpEntity<>(headers);
         ResponseEntity<Map> response = restTemplate.exchange(
-                builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
+            builder.build().encode().toUri(), HttpMethod.GET, entity, Map.class);
 
         if (response.getStatusCode() == HttpStatus.OK && response.hasBody()) {
             Map<String, Object> body = response.getBody();
@@ -182,4 +187,3 @@ public class ClusterService {
         return Map.of();
     }
 }
-
