@@ -32,7 +32,8 @@ public record PodResourceDto(
             .node(Objects.requireNonNull(pod.getSpec()).getNodeName())
             .status(Objects.requireNonNull(pod.getStatus()).getPhase())
             .ip(pod.getStatus().getPodIP())
-            .priorityClass(pod.getSpec().getPriorityClassName())
+            .priorityClass(pod.getSpec().getPriorityClassName() == null ? "Guaranteed"
+                : pod.getSpec().getPriorityClassName())
             .restartCount(pod.getStatus().getContainerStatuses().get(0).getRestartCount())
             .serviceAccount(pod.getSpec().getServiceAccountName())
             .imagePullSecret(
