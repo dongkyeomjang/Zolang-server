@@ -27,9 +27,6 @@ public class GithubService {
     private final StringEncryptor stringEncryptor;
     private final RestTemplate restTemplate;
 
-    @Value("${github.webhook-url}")
-    private String webhookUrl;
-
     private HttpHeaders createHeaders(String token) {
         HttpHeaders headers = new HttpHeaders();
         headers.set("Authorization", "token " + token);
@@ -166,31 +163,6 @@ public class GithubService {
         } catch (HttpClientErrorException e) {
             // 오류 응답 코드 처리
             return false;
-        }
-    }
-
-    public void createWebhook(Long userId, String repoName) {
-        String nickname = getUserNickname(userId);
-        String token = getUserGithubToken(userId);
-
-        String apiUrl = String.format("https://api.github.com/repos/%s/%s/hooks", nickname, repoName);
-        try {
-            Map<String, Object> body = new HashMap<>();
-            body.put("name", "web");
-            body.put("active", true);
-            body.put("events", Arrays.asList("push", "pull_request"));
-
-            Map<String, String> config = new HashMap<>();
-            config.put("url", webhookUrl);
-            config.put("content_type", "json");
-
-            body.put("config", config);
-
-            HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, createHeaders(token));
-
-            restTemplate.postForEntity(apiUrl, entity, String.class);
-        } catch (HttpClientErrorException e) {
-            throw new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK);
         }
     }
 
