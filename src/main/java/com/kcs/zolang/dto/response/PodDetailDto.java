@@ -22,8 +22,8 @@ public record PodDetailDto(
     @Nullable
     @Schema(description = "퍼시스턴트 볼륨 클레임")
     List<PodPersistentVolumeClaimDto> persistentVolumeClaims,
-    @Schema(description = "컨테이너 리스트")
-    ContainerDto containers
+    @Schema(description = "컨테이너 정보")
+    ContainerDto container
 ) {
 
     public static PodDetailDto fromEntity(V1Pod pod,
@@ -38,7 +38,7 @@ public record PodDetailDto(
                 pod.getStatus().getConditions().stream().map(PodConditionsDto::fromEntity).toList())
             .controlled(controlledDtoList)
             .persistentVolumeClaims(pvcDtoList)
-            .containers(pod.getSpec().getContainers().get(0) != null
+            .container(pod.getSpec().getContainers().get(0) != null
                 ? ContainerDto.fromEntity(pod.getStatus().getContainerStatuses().get(0),
                 pod.getSpec().getContainers().get(0), volumes)
                 : null)

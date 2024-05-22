@@ -5,8 +5,6 @@ import org.springframework.cache.annotation.EnableCaching;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.data.redis.connection.RedisConnectionFactory;
-import org.springframework.data.redis.connection.RedisPassword;
-import org.springframework.data.redis.connection.RedisStandaloneConfiguration;
 import org.springframework.data.redis.connection.lettuce.LettuceConnectionFactory;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.data.redis.serializer.GenericJackson2JsonRedisSerializer;
@@ -24,14 +22,9 @@ public class RedisConfig {
     @Value("${spring.session.redis.port}")
     private int port;
 
-    @Value("${spring.session.redis.password}")
-    private String password;
-
     @Bean
     public RedisConnectionFactory redisConnectionFactory() {
-        RedisStandaloneConfiguration config = new RedisStandaloneConfiguration(host, port);
-        config.setPassword(RedisPassword.of(password));
-        return new LettuceConnectionFactory(config);
+        return new LettuceConnectionFactory(host, port);
     }
 
     @Bean
