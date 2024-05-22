@@ -1,9 +1,9 @@
-
----
-
 spring:
   profiles:
     active: local
+    include:
+      - local
+
 
 ---
 

@@ -9,6 +9,7 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.jasypt.encryption.StringEncryptor;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.oauth2.client.OAuth2AuthorizedClient;
@@ -21,6 +22,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.io.IOException;
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
     private final JwtUtil jwtUtil;
     private final UserRepository userRepository;
@@ -34,6 +36,7 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
         OAuth2AuthorizedClient client = authorizedClientService.loadAuthorizedClient(
                 oauthToken.getAuthorizedClientRegistrationId(),
                 oauthToken.getName());
+        log.info("Oauth2SuccessHandler 진입 성공. client = {}", client);
 
         if (client == null) {
             throw new IllegalArgumentException("No client information available in session");
@@ -43,11 +46,11 @@ public class Oauth2SuccessHandler implements AuthenticationSuccessHandler {
         String encryptedAccessToken = stringEncryptor.encrypt(originalAccessToken); // 액세스 토큰 암호화
         UserPrincipal principal = (UserPrincipal) authentication.getPrincipal();
         JwtTokenDto jwtTokenDto = jwtUtil.generateTokens(principal.getUserId(), principal.getRole());
-
+        log.info("user 정보: {}", principal.getUserId());
         userRepository.updateRefreshTokenAndLoginStatusAndGithubAccessToken(
                 principal.getUserId(), jwtTokenDto.refreshToken(), true, encryptedAccessToken); // 암호화된 토큰 저장
 
         AuthenticationResponse.makeLoginSuccessResponse(response, jwtTokenDto, jwtUtil.getRefreshExpiration());
-        response.sendRedirect("http://localhost:5173/dashboard");
+        response.sendRedirect("https://www.zolang.site");
     }
 }

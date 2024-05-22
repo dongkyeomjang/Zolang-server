@@ -19,6 +19,7 @@ public enum ErrorCode {
     NOT_FOUND_CLUSTER(40402, HttpStatus.NOT_FOUND, "해당 클러스터가 존재하지 않습니다."),
     NOT_FOUND_REPOSITORY(40403, HttpStatus.NOT_FOUND, "해당 저장소가 존재하지 않습니다."),
     NOT_FOUND_CONDITION(40404, HttpStatus.NOT_FOUND, "해당 조건에 맞는 데이터가 존재하지 않습니다."),
+    NOT_FOUND_POD(40405, HttpStatus.NOT_FOUND, "해당 파드가 존재하지 않습니다."),
     NOT_FOUND_NETWORK(40405, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
 
     // Invalid Argument Error
@@ -55,7 +56,8 @@ public enum ErrorCode {
     FILE_STORAGE_ERROR(50001, HttpStatus.INTERNAL_SERVER_ERROR, "파일 저장에 실패하였습니다."),
     CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
     API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다."),
-    FAILED_CREATE_WEBHOOK(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
+    KUBECTL_ERROR(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Kubectl 명령어 실행에 실패하였습니다."),
+    FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;

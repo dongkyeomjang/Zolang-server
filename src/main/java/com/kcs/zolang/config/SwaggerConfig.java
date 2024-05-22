@@ -49,7 +49,7 @@ public class SwaggerConfig {
                                 .url("http://localhost:8080")
                                 .description("Local Server"),
                         new io.swagger.v3.oas.models.servers.Server()
-                                .url("https://zolang.site")
+                                .url("https://kcs.zolang.site")
                                 .description("Remote Server")));
     }
 }

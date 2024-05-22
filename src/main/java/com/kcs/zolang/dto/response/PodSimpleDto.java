@@ -4,7 +4,6 @@ import static com.kcs.zolang.utility.MonitoringUtil.DATE_TIME_FORMATTER;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
 import io.kubernetes.client.openapi.models.V1Container;
-import io.kubernetes.client.openapi.models.V1ContainerStatus;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.swagger.v3.oas.annotations.media.Schema;
 import java.util.List;
@@ -28,22 +27,28 @@ public record PodSimpleDto(
     @Schema(description = "Pod 상태", example = "Running")
     String status,
     @Schema(description = "Pod 재시작 횟수", example = "0")
-    List<Integer> restartCount,
+    int restartCount,
+    @Schema(description = "Pod 현재 자원 사용량")
+    UsageDto usage,
+    @Schema(description = "Pod 지난 자원 사용량 리스트")
+    List<UsageDto> metrics,
     @Schema(description = "Pod 생성 시간", example = "1d")
     String age,
     @Schema(description = "Pod 생성 일시", example = "2021-12-01 오후 12:00:00")
     String creationDateTime
 ) {
 
-    public static PodSimpleDto fromEntity(V1Pod pod) {
+    public static PodSimpleDto fromEntity(V1Pod pod, UsageDto usage, List<UsageDto> metrics) {
         return PodSimpleDto.builder()
-            .name(Objects.requireNonNull(pod.getMetadata()).getName())
+            .name(pod.getMetadata().getName())
             .namespace(pod.getMetadata().getNamespace())
             .images(pod.getSpec().getContainers().stream().map(V1Container::getImage).toList())
             .labels(pod.getMetadata().getLabels())
-            .restartCount(pod.getStatus().getContainerStatuses().stream()
-                .map(V1ContainerStatus::getRestartCount).toList())
+            .restartCount(pod.getStatus().getContainerStatuses() == null ? 0
+                : pod.getStatus().getContainerStatuses().get(0).getRestartCount())
             .node(pod.getSpec().getNodeName())
+            .usage(usage)
+            .metrics(metrics)
             .age(getAge(
                 Objects.requireNonNull(pod.getMetadata().getCreationTimestamp()).toLocalDateTime()))
             .status(pod.getStatus().getPhase())

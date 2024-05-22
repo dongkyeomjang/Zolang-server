@@ -3,20 +3,35 @@ kind: Ingress
 metadata:
   name: zolang-ingress
   annotations:
-    cert-manager.io/cluster-issuer: "letsencrypt-production"
-    nginx.ingress.kubernetes.io/rewrite-target: /
+    cert-manager.io/cluster-issuer: "letsencrypt"
     nginx.ingress.kubernetes.io/ssl-redirect: "true"
     nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "8m"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "16k"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "4"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/affinity: "cookie"
+    nginx.ingress.kubernetes.io/session-cookie-name: "route"
+    nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
-        - zolang.site
+        - kcs.zolang.site
       secretName: zolang-tls
   rules:
-    - host: zolang.site
+    - host: kcs.zolang.site
       http:
         paths:
+          - path: /login/oauth2/code/github
+            pathType: Prefix
+            backend:
+              service:
+                name: zolang-service
+                port:
+                  number: 80
           - path: /
             pathType: Prefix
             backend:

@@ -35,9 +35,6 @@ public class Cluster {
     @Column(name = "version", nullable = false)
     private String version;
 
-    @Column(name = "cert_path", nullable = true)
-    private String certPath;
-
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
@@ -49,7 +46,6 @@ public class Cluster {
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
         this.version = version;
-        this.certPath = certPath;
         this.createdAt = LocalDateTime.now();
     }
     public void update(String clusterName, String secretToken, String domainUrl, String version) {

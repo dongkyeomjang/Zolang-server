@@ -1,18 +1,21 @@
 package com.kcs.zolang.service;
 
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
+import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
 import com.kcs.zolang.dto.response.CommonControllerDto;
 import com.kcs.zolang.dto.response.ControllerCronJobDto;
+import com.kcs.zolang.dto.response.DeploymentDetailDto;
 import com.kcs.zolang.dto.response.PodControlledDto;
 import com.kcs.zolang.dto.response.PodDetailDto;
+import com.kcs.zolang.dto.response.PodListDto;
 import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
+import com.kcs.zolang.dto.response.UsageDto;
 import com.kcs.zolang.dto.response.WorkloadOverviewDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
-import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
@@ -21,16 +24,16 @@ import io.kubernetes.client.openapi.models.V1CronJob;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Job;
-import io.kubernetes.client.openapi.models.V1NamespaceList;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
 import io.kubernetes.client.openapi.models.V1Volume;
+import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -38,6 +41,9 @@ import org.springframework.stereotype.Service;
 public class WorkloadService {
 
     private final MonitoringUtil monitoringUtil;
+
+    private final RedisTemplate<String, Object> redisTemplate;
+
 
     public WorkloadOverviewDto getOverview(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
@@ -91,57 +97,78 @@ public class WorkloadService {
         }
     }
 
-    public List<PodSimpleDto> getPodList(Long userId, Long clusterId) {
-        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+    public PodListDto getPodList(Long userId, Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().getMinute();
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
-            V1NamespaceList namespaceList = coreV1Api.listNamespace().execute();
+            List<V1Pod> podList = coreV1Api.listPodForAllNamespaces().execute().getItems();
+            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList, m);
+            List<String> totalKeys = new ArrayList<>();
+            for (int i = 13; i > 0; i--) {
+                totalKeys.add(
+                    "cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m - i)) % 60));
+            }
+            List<UsageDto> jsonData = getUsage(totalKeys);
             //모든 네임스페이스의 pod list
-            return coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
-                .map(PodSimpleDto::fromEntity).toList();
+            return PodListDto.fromEntity(jsonData, podSimpleDtoList);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<PodSimpleDto> getPodListByNamespace(Long userId, String namespace, Long clusterId) {
-        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+    public PodListDto getPodListByNamespace(Long userId, String namespace, Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().minusSeconds(10).getMinute();
         try {
-            CoreV1Api coreV1Api = new CoreV1Api();
-            /*
             //파드 사용량 추출
-            List<Pair<V1Pod, PodMetrics>> a = top(V1Pod.class, PodMetrics.class).apiClient(client)
-                .namespace(namespace)
-                .execute();*/
+            CoreV1Api coreV1Api = new CoreV1Api();
+            List<V1Pod> podList = coreV1Api.listNamespacedPod(namespace).execute().getItems();
+            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList, m);
+            List<String> keys = new ArrayList<>();
+            for (int i = 13; i > 0; i--) {
+                keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
+                    (60 + (m - i)) % 60));
+            }
+            List<UsageDto> totalUsage = getUsage(keys);
             //특정 네임스페이스의 pod list
-            return coreV1Api.listNamespacedPod(namespace).execute().getItems().stream()
-                .map(PodSimpleDto::fromEntity).toList();
+            return PodListDto.fromEntity(totalUsage, podSimpleDtoList);
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw new RuntimeException(e);
         }
     }
 
     public PodDetailDto getPodDetail(Long userId, String name, String namespace, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
+        int m = LocalDateTime.now().getMinute();
         try {
+            List<UsageDto> podUsage = getPodMetrics(clusterId, name, m);
             CoreV1Api coreV1Api = new CoreV1Api();
             V1Pod pod = coreV1Api.readNamespacedPod(name, namespace).execute();
+            if (pod == null) {
+                return null;
+            }
             V1OwnerReference ownerReference = pod.getMetadata().getOwnerReferences().get(0);
             PodControlledDto controlledDto = getControlled(ownerReference.getKind(),
                 ownerReference.getName(), namespace);
             List<PodPersistentVolumeClaimDto> pvcDtoList = new ArrayList<>();
-            List<V1Volume> podSpec = pod.getSpec().getVolumes();
-            for (V1Volume v : podSpec) {
-                if (v.getPersistentVolumeClaim() != null) {
-                    pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
-                        v.getPersistentVolumeClaim().getClaimName(), namespace));
+            List<V1Volume> volumes = pod.getSpec().getVolumes();
+            if (volumes != null) {
+                for (V1Volume v : volumes) {
+                    if (v.getPersistentVolumeClaim() != null) {
+                        pvcDtoList.add(getPersistentVolumeClaim(coreV1Api,
+                            v.getPersistentVolumeClaim().getClaimName(), namespace));
+                    }
                 }
             }
             return PodDetailDto.fromEntity(pod,
                 getAge(Objects.requireNonNull(pod.getMetadata().getCreationTimestamp())
                     .toLocalDateTime()),
-                controlledDto, pvcDtoList);
+                controlledDto, pvcDtoList, podUsage, volumes);
         } catch (ApiException e) {
+            if (e.getCode() == 404) {
+                throw new CommonException(ErrorCode.NOT_FOUND_POD);
+            }
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
@@ -152,6 +179,18 @@ public class WorkloadService {
             AppsV1Api appsV1Api = new AppsV1Api();
             return appsV1Api.listDeploymentForAllNamespaces().execute()
                 .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+    public DeploymentDetailDto getDeploymentDetail(Long userId, String name, String namespace,
+        Long clusterId) {
+        monitoringUtil.getV1Api(userId, clusterId);
+        try {
+            AppsV1Api appsV1Api = new AppsV1Api();
+            V1Deployment deployment = appsV1Api.readNamespacedDeployment(name, namespace).execute();
+            return DeploymentDetailDto.fromEntity(deployment);
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -378,13 +417,47 @@ public class WorkloadService {
             statefulSetCount, cronJobCount, jobCount, podCount);
     }
 
-    private PodPersistentVolumeClaimDto getPersistentVolumeClaim(CoreV1Api coreV1Api,
-        String name, String podNamespace) {
+    private PodPersistentVolumeClaimDto getPersistentVolumeClaim(CoreV1Api coreV1Api, String name,
+        String namespace) {
         try {
             return PodPersistentVolumeClaimDto.fromEntity(
-                coreV1Api.readNamespacedPersistentVolumeClaim(name, podNamespace).execute());
+                coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace).execute());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
+    }
+
+    private List<UsageDto> getUsage(List<String> keys) {
+        List<UsageDto> usageDtoList = new ArrayList<>();
+        for (String key : keys) {
+            usageDtoList.add(redisTemplate.opsForValue().get(key) == null ? null
+                : (UsageDto) redisTemplate.opsForValue().get(key));
+        }
+        return usageDtoList;
+    }
+
+    private List<UsageDto> getPodMetrics(Long clusterId, String name, int m) {
+        List<String> keys = new ArrayList<>();
+        for (int i = 13; i > 0; i--) {
+            keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
+        }
+        return getUsage(keys);
+    }
+
+    private List<PodSimpleDto> getPodSimpleDtoList(Long clusterId, List<V1Pod> podList, int m) {
+        List<PodSimpleDto> podSimpleDtoList = new ArrayList<>();
+        String key;
+        for (V1Pod p : podList) {
+            key = "cluster-usage:" + clusterId + ":" + p.getMetadata().getName() + ":" + m;
+            podSimpleDtoList.add(
+                PodSimpleDto.fromEntity(p, getUsage(List.of(key)).get(0),
+                    getPodMetrics(clusterId, p.getMetadata().getName(), m)));
+        }
+        return podSimpleDtoList;
+    }
+
+    private String getTime(int m) {
+        int h = LocalDateTime.now().getHour();
+        return h + ":" + (m < 10 ? "0" + m : m);
     }
 }
