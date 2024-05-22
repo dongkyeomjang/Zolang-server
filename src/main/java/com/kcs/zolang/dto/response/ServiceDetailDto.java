@@ -63,7 +63,7 @@ public record ServiceDetailDto(
                 );
 
                 Status status = new Status(
-                        null // This line can be modified based on the actual status information you want to include
+                        null //추후 수정
                 );
 
                 return new ServiceDetailDto(metaData, spec, status);
