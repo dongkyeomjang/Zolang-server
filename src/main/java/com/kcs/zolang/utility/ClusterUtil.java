@@ -16,6 +16,9 @@ import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.StringReader;
+import java.time.Instant;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.concurrent.TimeUnit;
 
 public class ClusterUtil {
@@ -129,12 +132,19 @@ public class ClusterUtil {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
             AppsV1Api api = new AppsV1Api();
+
             V1Deployment deployment = api.readNamespacedDeployment(cicd.getRepositoryName(), "default").execute();
-            api.replaceNamespacedDeployment(cicd.getRepositoryName(), "default", deployment); // 검증 필요
-        } catch (IOException e) {
+
+            Map<String, String> annotations = deployment.getSpec().getTemplate().getMetadata().getAnnotations();
+            if (annotations == null) {
+                annotations = new HashMap<>();
+            }
+            annotations.put("kubectl.kubernetes.io/restartedAt", Instant.now().toString());
+            deployment.getSpec().getTemplate().getMetadata().setAnnotations(annotations);
+
+            api.replaceNamespacedDeployment(cicd.getRepositoryName(), "default", deployment);
+        } catch (IOException | ApiException e) {
             throw new RuntimeException("Failed to rollout deployment", e);
-        } catch (ApiException e) {
-            throw new RuntimeException(e);
         }
     }
 
