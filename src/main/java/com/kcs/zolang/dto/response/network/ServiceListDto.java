@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.network;
 
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
