@@ -152,6 +152,7 @@ public class ClusterService {
                 "yum install -y aws-cli\n" +
                 String.format("/etc/eks/bootstrap.sh %s", clusterName);
     }
+    @Transactional
     public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) throws IOException {
         // 이미 존재하는 클러스터를 등록.
         User user = userRepository.findById(userId)
