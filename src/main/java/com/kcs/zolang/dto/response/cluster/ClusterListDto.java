@@ -1,8 +1,7 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.cluster;
 
 import com.kcs.zolang.domain.Cluster;
 import lombok.Builder;
-import lombok.Getter;
 
 @Builder
 public record ClusterListDto(
