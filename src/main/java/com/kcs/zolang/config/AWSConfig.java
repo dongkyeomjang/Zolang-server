@@ -9,7 +9,7 @@ import software.amazon.awssdk.services.eks.EksClient;
 import software.amazon.awssdk.services.sts.StsClient;
 
 @Configuration
-public class EKSClientConfig {
+public class AWSConfig {
     @Value("${aws.region}")
     private String region;
 
@@ -33,4 +33,5 @@ public class EKSClientConfig {
                 .region(Region.of(region))
                 .build();
     }
+
 }
