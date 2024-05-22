@@ -4,7 +4,7 @@ import com.kcs.zolang.domain.Cluster;
 import lombok.Builder;
 
 @Builder
-public record CreateClusterResponseDto(
+public record ClusterCreateResponseDto(
         String userName,
         String clusterName,
         String provider,
@@ -12,8 +12,8 @@ public record CreateClusterResponseDto(
         String domainUrl,
         String version
 ) {
-    public CreateClusterResponseDto fromEntity(Cluster cluster) {
-        return CreateClusterResponseDto.builder()
+    public static ClusterCreateResponseDto fromEntity(Cluster cluster) {
+        return ClusterCreateResponseDto.builder()
                 .userName(cluster.getUser().getNickname())
                 .clusterName(cluster.getClusterName())
                 .provider(cluster.getProvider())

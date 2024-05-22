@@ -15,12 +15,17 @@ metadata:
     nginx.ingress.kubernetes.io/affinity: "cookie"
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
     nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+    nginx.ingress.kubernetes.io/rewrite-target: /$1
 spec:
   ingressClassName: nginx
   tls:
     - hosts:
         - kcs.zolang.site
       secretName: zolang-tls
+    - hosts:
+        - zolang.site
+        - www.zolang.site
+      secretName: zolang-ssl-cert
   rules:
     - host: kcs.zolang.site
       http:
@@ -37,5 +42,25 @@ spec:
             backend:
               service:
                 name: zolang-service
+                port:
+                  number: 80
+    - host: zolang.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zolang-frontend-service
+                port:
+                  number: 80
+    - host: www.zolang.site
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: zolang-frontend-service
                 port:
                   number: 80
