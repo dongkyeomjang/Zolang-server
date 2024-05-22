@@ -80,6 +80,14 @@ dependencies {
     // https://mvnrepository.com/artifact/org.springframework.session/spring-session-data-redis
     implementation group: 'org.springframework.session', name: 'spring-session-data-redis', version: '3.2.2'
 
+    // aws sdk
+    // https://mvnrepository.com/artifact/software.amazon.awssdk/eks
+    implementation group: 'software.amazon.awssdk', name: 'eks', version: '2.25.56'
+    // https://mvnrepository.com/artifact/software.amazon.awssdk/sts
+    implementation group: 'software.amazon.awssdk', name: 'sts', version: '2.25.56'
+    // https://mvnrepository.com/artifact/software.amazon.awssdk/ec2
+    implementation group: 'software.amazon.awssdk', name: 'ec2', version: '2.25.56'
+
 }
 
 tasks.named('test') {
