@@ -23,6 +23,9 @@ public class Cluster {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
+    @Column(name = "provider", nullable = false)
+    private String provider;
+
     @Column(name = "cluster_name", nullable = false)
     private String clusterName;
 
@@ -40,9 +43,10 @@ public class Cluster {
     private LocalDateTime createdAt;
 
     @Builder
-    public Cluster(User user, String clusterName, String secretToken, String domainUrl, String version, String certPath) {
+    public Cluster(User user, String clusterName, String provider, String secretToken, String domainUrl, String version, String certPath) {
         this.user = user;
         this.clusterName = clusterName;
+        this.provider = provider;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
         this.version = version;

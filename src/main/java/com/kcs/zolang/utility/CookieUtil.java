@@ -28,9 +28,9 @@ public class CookieUtil {
     public static void addCookie(HttpServletResponse response, String name, String value) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .path("/")
-                .domain(".zolang.site") 
+                .domain(".zolang.store")
                 .maxAge(60 * 60 * 24 * 30) // 30일 설정
-                .httpOnly(true) 
+                .httpOnly(false)
                 .sameSite("Lax") 
                 .secure(true)
                 .build();
@@ -40,9 +40,9 @@ public class CookieUtil {
     public static void addSecureCookie(HttpServletResponse response, String name, String value, Integer maxAge) {
         ResponseCookie cookie = ResponseCookie.from(name, value)
                 .path("/")
-                .domain(".zolang.site") 
+                .domain(".zolang.store")
                 .maxAge(maxAge)
-                .httpOnly(true) 
+                .httpOnly(false)
                 .sameSite("Lax") 
                 .secure(true) 
                 .build();
@@ -60,9 +60,9 @@ public class CookieUtil {
             if (cookie.getName().equals(name)) {
                 ResponseCookie deleteCookie = ResponseCookie.from(name,null)
                         .path("/")
-                        .domain(".zolang.site")
+                        .domain(".zolang.store")
                         .maxAge(0)
-                        .httpOnly(true) 
+                        .httpOnly(false)
                         .sameSite("Lax") 
                         .secure(true) 
                         .build();

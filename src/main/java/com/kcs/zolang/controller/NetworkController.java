@@ -20,21 +20,21 @@ import org.springframework.web.bind.annotation.RestController;
 public class NetworkController {
     private final NetworkService networkService;
 
-    @GetMapping("/{clusterId}/service")
+    @GetMapping("/{cluster_id}/service")
     @Operation(summary = "Network-service 목록 조회", description = "사용자의 네트워크-서비스 목록 조회")
     public ResponseDto<?> getServiceList(
             @UserId Long userId,
-            @PathVariable(name = "clusterId") Long clusterId
+            @PathVariable(name = "cluster_id") Long clusterId
     ) {
         return ResponseDto.ok(networkService.getServiceList(userId, clusterId));
     }
 
-    @GetMapping("/{clusterId}/service/{serviceName}")
+    @GetMapping("/{cluster_id}/service/{service_name}")
     @Operation(summary = "Network-service 목록 조회", description = "사용자의 네트워크-서비스 상세 조회")
     public ResponseDto<?> getServiceDetail(
             @UserId Long userId,
-            @PathVariable(name = "clusterId") Long clusterId,
-            @PathVariable(name = "serviceName") String serviceName
+            @PathVariable(name = "cluster_id") Long clusterId,
+            @PathVariable(name = "service_name") String serviceName
     ) {
         return ResponseDto.ok(networkService.getServiceDetail(userId, clusterId, serviceName));
     }

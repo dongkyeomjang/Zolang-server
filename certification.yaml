@@ -1,0 +1,28 @@
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: frontend-cert
+  namespace: default
+spec:
+  secretName: frontend-cert
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  commonName: www.zolang.store
+  dnsNames:
+    - www.zolang.store
+    - zolang.store
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: backend-cert
+  namespace: default
+spec:
+  secretName: zolang-tls
+  issuerRef:
+    name: letsencrypt
+    kind: ClusterIssuer
+  commonName: kcs.zolang.store
+  dnsNames:
+    - kcs.zolang.store
