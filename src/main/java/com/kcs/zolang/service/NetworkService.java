@@ -1,7 +1,7 @@
 package com.kcs.zolang.service;
 
-import com.kcs.zolang.dto.response.ServiceDetailDto;
-import com.kcs.zolang.dto.response.ServiceListDto;
+import com.kcs.zolang.dto.response.network.ServiceDetailDto;
+import com.kcs.zolang.dto.response.network.ServiceListDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
