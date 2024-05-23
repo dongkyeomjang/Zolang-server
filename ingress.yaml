@@ -15,6 +15,16 @@ metadata:
     nginx.ingress.kubernetes.io/affinity: "cookie"
     nginx.ingress.kubernetes.io/session-cookie-name: "route"
     nginx.ingress.kubernetes.io/session-cookie-hash: "sha1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers 'Access-Control-Allow-Origin: https://www.zolang.store';
+      more_set_headers 'Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS';
+      more_set_headers 'Access-Control-Allow-Headers: Content-Type, Authorization, withCredentials';
+      if ($request_method = 'OPTIONS') {
+        more_set_headers 'Access-Control-Max-Age: 1728000';
+        more_set_headers 'Content-Type: text/plain charset=UTF-8';
+        more_set_headers 'Content-Length: 0';
+        return 204;
+      }
 spec:
   ingressClassName: nginx
   tls:
