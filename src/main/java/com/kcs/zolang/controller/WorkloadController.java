@@ -73,7 +73,7 @@ public class WorkloadController {
     @Operation(summary = "Pod 상세 조회", description = "특정 Pod 상세 조회")
     public ResponseDto<?> getPod(
         @UserId Long userId,
-        @PathVariable(name = "podName") String name,
+        @PathVariable(name = "pod_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -96,7 +96,7 @@ public class WorkloadController {
     @Operation(summary = "Deployment 상세 조회", description = "특정 Deployment 상세 조회")
     public ResponseDto<?> getDeploymentDetail(
         @UserId Long userId,
-        @PathVariable(name = "deploymentName") String name,
+        @PathVariable(name = "deployment_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -146,7 +146,7 @@ public class WorkloadController {
     @Operation(summary = "DaemonSet 상세 조회", description = "특정 DaemonSet 상세 조회")
     public ResponseDto<?> getDaemonSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "daemonSetName") String name,
+        @PathVariable(name = "daemon_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -183,7 +183,7 @@ public class WorkloadController {
     @Operation(summary = "ReplicaSet 상세 조회", description = "특정 ReplicaSet 상세 조회")
     public ResponseDto<?> getReplicaSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "replicaSetName") String name,
+        @PathVariable(name = "replica_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -220,7 +220,7 @@ public class WorkloadController {
     @Operation(summary = "StatefulSet 상세 조회", description = "특정 StatefulSet 상세 조회")
     public ResponseDto<?> getStatefulSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "statefulSetName") String name,
+        @PathVariable(name = "stateful_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
