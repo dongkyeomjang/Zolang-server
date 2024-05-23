@@ -30,7 +30,4 @@ public class Constants {
             "/v3/api-docs/**",
             "/swagger-ui/**"
             );
-
-    public static List<String> USER_URLS = List.of(
-            "/api/v1/users/**");
 }
