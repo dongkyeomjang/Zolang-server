@@ -564,8 +564,11 @@ public class WorkloadService {
             List<V1Service> serviceList = coreV1Api.listNamespacedService(namespace).execute()
                 .getItems();
             for (V1Service item : serviceList) {
-                if (item.getSpec().getSelector().get("app").equals(name.split("-")[0])) {
-                    services.add(item);
+                String selector = item.getSpec().getSelector().get("app");
+                if (selector != null) {
+                    if (selector.equals(name)) {
+                        services.add(item);
+                    }
                 }
             }
         } catch (ApiException e) {
