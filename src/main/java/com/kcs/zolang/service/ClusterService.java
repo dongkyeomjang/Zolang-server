@@ -15,10 +15,7 @@ import com.kcs.zolang.utility.ClusterUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.*;
 import org.springframework.stereotype.Service;
-import org.springframework.web.client.RestTemplate;
-import org.springframework.web.util.UriComponentsBuilder;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateLaunchTemplateRequest;
 import software.amazon.awssdk.services.ec2.model.CreateLaunchTemplateResponse;
@@ -180,6 +177,7 @@ public class ClusterService {
                         .secretToken(registerClusterDto.secretToken())
                         .user(user)
                         .version(registerClusterDto.version())
+                        .provider("external")
                         .build()
         )
                 .getId();
