@@ -6,7 +6,6 @@ import com.kcs.zolang.dto.request.RegisterClusterDto;
 import com.kcs.zolang.service.ClusterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
-import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -23,8 +22,7 @@ public class ClusterController {
     @Operation(summary = "클러스터 등록", description = "사용자의 클러스터를 등록")
     public ResponseDto<?> registerCluster(
             @UserId Long userId,
-            @RequestPart(value = "message")
-            @Valid RegisterClusterDto registerClusterDto
+            @RequestBody RegisterClusterDto registerClusterDto
             ) throws IOException {
         return ResponseDto.created(clusterService.registerCluster(userId, registerClusterDto));
     }
@@ -45,31 +43,31 @@ public class ClusterController {
         return ResponseDto.ok(clusterService.getClusters(userId));
     }
 
-    @GetMapping("/{clusterId}/status")
+    @GetMapping("/{cluster_id}/status")
     @Operation(summary = "클러스터 상태 조회", description = "클러스터의 상태를 조회. 클러스터 목록 조회와 같이 호출되어야함")
     public ResponseDto<?> getClusterStatus(
             @UserId Long userId,
-            @PathVariable(name = "clusterId") Long clusterId
+            @PathVariable(name = "cluster_id") Long clusterId
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterStatus(userId, clusterId));
     }
 
-    @GetMapping("/{clusterId}/nodes")
+    @GetMapping("/{cluster_id}/nodes")
     @Operation(summary = "클러스터 노드 목록 조회", description = "등록된 클러스터의 노드 목록을 조회")
     public ResponseDto<?> getClusterNodes(
             @UserId Long userId,
-            @PathVariable(name = "clusterId") Long clusterId
+            @PathVariable(name = "cluster_id") Long clusterId
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodeList(userId, clusterId));
     }
 
 
-    @GetMapping("/{clusterId}/nodes/{nodeName}")
+    @GetMapping("/{cluster_id}/nodes/{node_name}")
     @Operation(summary = "클러스터 노드 상세 조회", description = "등록된 클러스터의 노드 상세 조회")
     public ResponseDto<?> getClusterNode(
             @UserId Long userId,
-            @PathVariable("clusterId") Long clusterId,
-            @PathVariable("nodeName") String nodeName
+            @PathVariable("cluster_id") Long clusterId,
+            @PathVariable("node_name") String nodeName
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodeDetail(userId, clusterId, nodeName));
     }
