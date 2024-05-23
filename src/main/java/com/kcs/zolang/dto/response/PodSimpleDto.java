@@ -27,7 +27,7 @@ public record PodSimpleDto(
     @Schema(description = "Pod 상태", example = "Running")
     String status,
     @Schema(description = "Pod 재시작 횟수", example = "0")
-    int restartCount,
+    Integer restartCount,
     @Schema(description = "Pod 현재 자원 사용량")
     UsageDto usage,
     @Schema(description = "Pod 지난 자원 사용량 리스트")
