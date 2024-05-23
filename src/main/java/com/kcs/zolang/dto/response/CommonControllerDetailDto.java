@@ -1,5 +1,6 @@
 package com.kcs.zolang.dto.response;
 
+import com.kcs.zolang.dto.response.network.ServiceListDto;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
@@ -19,12 +20,12 @@ public record CommonControllerDetailDto(
     @Schema(description = "해당 컨트롤러 파드 정보")
     List<PodSimpleDto> pods,
     @Schema(description = "해당 컨트롤러 서비스 정보")
-    List<ServiceSimpleDto> services
+    List<ServiceListDto> services
 ) {
 
     public static CommonControllerDetailDto fromEntity(V1DaemonSet daemonSet,
         List<PodSimpleDto> pods,
-        List<ServiceSimpleDto> services) {
+        List<ServiceListDto> services) {
         return CommonControllerDetailDto.builder()
             .commonControllerDto(daemonSet.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(daemonSet.getMetadata()))
@@ -48,7 +49,7 @@ public record CommonControllerDetailDto(
     }
 
     public static CommonControllerDetailDto fromEntity(V1ReplicaSet replicaSet,
-        List<PodSimpleDto> pods, List<ServiceSimpleDto> services) {
+        List<PodSimpleDto> pods, List<ServiceListDto> services) {
         return CommonControllerDetailDto.builder()
             .commonControllerDto(replicaSet.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(replicaSet.getMetadata()))

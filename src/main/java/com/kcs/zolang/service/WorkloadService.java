@@ -9,9 +9,9 @@ import com.kcs.zolang.dto.response.PodDetailDto;
 import com.kcs.zolang.dto.response.PodListDto;
 import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
 import com.kcs.zolang.dto.response.PodSimpleDto;
-import com.kcs.zolang.dto.response.ServiceSimpleDto;
 import com.kcs.zolang.dto.response.UsageDto;
 import com.kcs.zolang.dto.response.WorkloadOverviewDto;
+import com.kcs.zolang.dto.response.network.ServiceListDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
@@ -257,8 +257,8 @@ public class WorkloadService {
             String namespaceName = daemonSet.getMetadata().getNamespace();
             List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
                 namespaceName, kind);
-            List<ServiceSimpleDto> serviceList = getControllerServiceList(controllerName,
-                namespaceName, kind);
+            List<ServiceListDto> serviceList = getControllerServiceList(controllerName,
+                namespaceName);
             return CommonControllerDetailDto.fromEntity(daemonSet, podList, serviceList);
         } catch (ApiException e) {
             if (e.getCode() == 404) {
@@ -302,8 +302,8 @@ public class WorkloadService {
             String namespaceName = replicaSet.getMetadata().getNamespace();
             List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
                 namespaceName, kind);
-            List<ServiceSimpleDto> serviceList = getControllerServiceList(controllerName,
-                namespaceName, kind);
+            List<ServiceListDto> serviceList = getControllerServiceList(controllerName,
+                namespaceName);
             return CommonControllerDetailDto.fromEntity(replicaSet, podList, serviceList);
         } catch (ApiException e) {
             if (e.getCode() == 404) {
@@ -555,22 +555,21 @@ public class WorkloadService {
         return getPodSimpleDtoList(clusterId, pods, m);
     }
 
-    private List<ServiceSimpleDto> getControllerServiceList(String name, String namespace,
-        String kind) {
+    private List<ServiceListDto> getControllerServiceList(String name, String namespace) {
         CoreV1Api coreV1Api = new CoreV1Api();
         List<V1Service> services = new ArrayList<>();
         try {
             List<V1Service> serviceList = coreV1Api.listNamespacedService(namespace).execute()
                 .getItems();
             for (V1Service item : serviceList) {
-                if (item.getMetadata().getName().equals(name.split("-")[0])) {
+                if (item.getSpec().getSelector().get("app").equals(name.split("-")[0])) {
                     services.add(item);
                 }
             }
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
-        return services.stream().map(ServiceSimpleDto::fromEntity).toList();
+        return services.stream().map(ServiceListDto::fromEntity).toList();
     }
 
     private String getTime(int m) {
