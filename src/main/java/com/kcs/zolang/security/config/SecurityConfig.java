@@ -51,7 +51,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(registry ->
                         registry
                                 .requestMatchers(Constants.NO_NEED_AUTH_URLS.toArray(String[]::new)).permitAll()
-                                .requestMatchers(Constants.USER_URLS.toArray(String[]::new)).hasRole("USER")
                                 .anyRequest().authenticated()
                 );
 
