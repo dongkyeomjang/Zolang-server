@@ -22,7 +22,8 @@ public record DeploymentDetailDto(
 
     public static DeploymentDetailDto fromEntity(V1Deployment deployment) {
         return DeploymentDetailDto.builder()
-            .metadata(CommonMetadataDto.fromEntity(deployment))
+            .metadata(deployment.getMetadata() == null ? null
+                : CommonMetadataDto.fromEntity(deployment.getMetadata()))
             .resource(DeploymentResourceDto.fromEntity(deployment))
             .rollingUpdateStrategy(RolingUpdateStrategyDto.fromEntity(deployment))
             .podConditions(DeploymentPodStatusDto.fromEntity(deployment))
