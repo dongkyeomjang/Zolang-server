@@ -14,7 +14,6 @@ import java.util.stream.Collectors;
 
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;
 
-@Getter
 @Builder
 @Schema(name = "ServiceDetailDto", description = "유저 Service Detail 정보 Dto")
 public record ServiceDetailDto(
