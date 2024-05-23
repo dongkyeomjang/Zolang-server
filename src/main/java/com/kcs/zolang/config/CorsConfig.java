@@ -15,7 +15,7 @@ public class CorsConfig {
         CorsConfiguration corsConfig = new CorsConfiguration();
 
         corsConfig.setAllowCredentials(true);
-        corsConfig.setAllowedOrigins(List.of("http://localhost:8080", "http://localhost:5173", "https://zolang.site", "https://www.zolang.site"));
+        corsConfig.setAllowedOrigins(List.of("http://localhost:8080", "http://localhost:5173", "https://zolang.site", "https://www.zolang.site", "https://zolang.store", "https://www.zolang.store"));
         corsConfig.setAllowedMethods(List.of("GET", "POST", "PATCH", "DELETE", "PUT", "OPTIONS"));
         corsConfig.setAllowedHeaders(List.of("Authorization", "Content-Type"));
         corsConfig.setAllowCredentials(true);
