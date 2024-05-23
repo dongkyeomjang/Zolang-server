@@ -14,6 +14,7 @@ import com.kcs.zolang.security.service.CustomOauth2UserDetailService;
 import com.kcs.zolang.security.service.CustomUserDetailService;
 import com.kcs.zolang.utility.JwtUtil;
 import lombok.RequiredArgsConstructor;
+import org.springframework.web.filter.CorsFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -29,6 +30,7 @@ import org.springframework.security.web.authentication.logout.LogoutFilter;
 public class SecurityConfig {
     private final CustomLogoutProcessHandler customSignOutProcessHandler;
     private final CustomLogoutResultHandler customSignOutResultHandler;
+    private final CorsFilter corsFilter;
     private final JwtAccessDeniedHandler jwtAccessDeniedHandler;
     private final JwtAuthEntryPoint jwtAuthEntryPoint;
     private final CustomUserDetailService customUserDetailService;
@@ -39,22 +41,21 @@ public class SecurityConfig {
 
     @Bean
     protected SecurityFilterChain securityFilterChain(final HttpSecurity httpSecurity) throws Exception {
-        return httpSecurity
+        httpSecurity
                 .csrf(AbstractHttpConfigurer::disable) // csrf 보호 비활성화
+                .formLogin(AbstractHttpConfigurer::disable) // formLogin 기본 인증 방식 해제
                 .httpBasic(AbstractHttpConfigurer::disable) // httpBasic 기본 인증 방식 해제
                 .sessionManagement((sessionManagement) ->
                         sessionManagement.sessionCreationPolicy(SessionCreationPolicy.STATELESS) // 세션 사용 안하고 상태가 없는 방식으로 인증 = JWT 사용
                 )
-
                 .authorizeHttpRequests(registry ->
                         registry
                                 .requestMatchers(Constants.NO_NEED_AUTH_URLS.toArray(String[]::new)).permitAll()
                                 .requestMatchers(Constants.USER_URLS.toArray(String[]::new)).hasRole("USER")
                                 .anyRequest().authenticated()
-                )
+                );
 
-                .formLogin(AbstractHttpConfigurer::disable)
-
+        httpSecurity
                 .oauth2Login(oauth2 -> oauth2
                         .successHandler(oauth2SuccessHandler)
                         .failureHandler(oauth2FailureHandler)
@@ -65,14 +66,16 @@ public class SecurityConfig {
                                 .logoutUrl("/api/v1/auth/logout")
                                 .addLogoutHandler(customSignOutProcessHandler)
                                 .logoutSuccessHandler(customSignOutResultHandler)
-                )
+                );
 
+        httpSecurity
                 .exceptionHandling(configurer ->
                         configurer
                                 .authenticationEntryPoint(jwtAuthEntryPoint)
                                 .accessDeniedHandler(jwtAccessDeniedHandler)
-                )
-
+                );
+        httpSecurity
+                .addFilterBefore(corsFilter, CorsFilter.class)
                 .addFilterBefore(
                         new JwtAuthenticationFilter(jwtUtil, customUserDetailService),
                         LogoutFilter.class)
@@ -81,8 +84,8 @@ public class SecurityConfig {
                         JwtAuthenticationFilter.class)
                 .addFilterBefore(
                         new GlobalLoggerFilter(),
-                        JwtExceptionFilter.class)
+                        JwtExceptionFilter.class);
 
-                .getOrBuild();
+        return httpSecurity.build();
     }
 }
