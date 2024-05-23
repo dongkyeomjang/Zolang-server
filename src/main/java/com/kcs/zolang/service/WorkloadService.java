@@ -32,8 +32,6 @@ import io.kubernetes.client.openapi.models.V1Volume;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Objects;
-
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
@@ -237,29 +235,15 @@ public class WorkloadService {
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
-            CoreV1Api coreV1Api = new CoreV1Api();
             AppsV1Api appsV1Api = new AppsV1Api();
             V1DaemonSet daemonSet = appsV1Api.readNamespacedDaemonSet(name, namespace).execute();
-            List<V1Pod> list = coreV1Api.listNamespacedPod(daemonSet.getMetadata().getNamespace())
-                .execute().getItems();
-            List<V1Pod> daemonSetPods = new ArrayList<>();
-            for (V1Pod item : list) {
-                if (item.getMetadata().getOwnerReferences() != null) {
-                    V1OwnerReference owner = item.getMetadata().getOwnerReferences().get(0);
-                    {
-                        if (owner.getKind().equals("DaemonSet") && owner.getName()
-                            .equals(daemonSet.getMetadata().getName())) {
-                            daemonSetPods.add(item);
-                        }
-                    }
-                }
-            }
             String kind = "DaemonSet";
             String controllerName = daemonSet.getMetadata().getName();
             String namespaceName = daemonSet.getMetadata().getNamespace();
             List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
                 namespaceName, kind);
-            List<ServiceListDto> serviceList = getControllerServiceList(controllerName,
+            String k8sApp = daemonSet.getMetadata().getLabels().get("app");
+            List<ServiceListDto> serviceList = getControllerServiceList(k8sApp,
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(daemonSet, podList, serviceList);
         } catch (ApiException e) {
@@ -304,7 +288,8 @@ public class WorkloadService {
             String namespaceName = replicaSet.getMetadata().getNamespace();
             List<PodSimpleDto> podList = getControllerPodList(clusterId, controllerName,
                 namespaceName, kind);
-            List<ServiceListDto> serviceList = getControllerServiceList(controllerName,
+            String k8sApp = replicaSet.getMetadata().getLabels().get("app");
+            List<ServiceListDto> serviceList = getControllerServiceList(k8sApp,
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(replicaSet, podList, serviceList);
         } catch (ApiException e) {
@@ -557,7 +542,10 @@ public class WorkloadService {
         return getPodSimpleDtoList(clusterId, pods, m);
     }
 
-    private List<ServiceListDto> getControllerServiceList(String name, String namespace) {
+    private List<ServiceListDto> getControllerServiceList(String k8sApp, String namespace) {
+        if (k8sApp == null) {
+            return null;
+        }
         CoreV1Api coreV1Api = new CoreV1Api();
         List<V1Service> services = new ArrayList<>();
         try {
@@ -566,7 +554,7 @@ public class WorkloadService {
             for (V1Service item : serviceList) {
                 String selector = item.getSpec().getSelector().get("app");
                 if (selector != null) {
-                    if (selector.equals(name)) {
+                    if (selector.equals(k8sApp)) {
                         services.add(item);
                     }
                 }
