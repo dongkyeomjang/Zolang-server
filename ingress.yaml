@@ -44,23 +44,3 @@ spec:
                 name: zolang-service
                 port:
                   number: 80
-    - host: zolang.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: zolang-frontend-service
-                port:
-                  number: 80
-    - host: www.zolang.site
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: zolang-frontend-service
-                port:
-                  number: 80

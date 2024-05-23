@@ -6,6 +6,7 @@ import com.kcs.zolang.dto.request.RegisterClusterDto;
 import com.kcs.zolang.service.ClusterService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,15 +19,22 @@ import java.io.IOException;
 public class ClusterController {
     private final ClusterService clusterService;
 
-    @PostMapping(value = "", consumes = {MediaType.MULTIPART_FORM_DATA_VALUE,MediaType.APPLICATION_JSON_VALUE})
+    @PostMapping("")
     @Operation(summary = "클러스터 등록", description = "사용자의 클러스터를 등록")
     public ResponseDto<?> registerCluster(
             @UserId Long userId,
             @RequestPart(value = "message")
             @Valid RegisterClusterDto registerClusterDto
-
             ) throws IOException {
         return ResponseDto.created(clusterService.registerCluster(userId, registerClusterDto));
+    }
+    @PostMapping("/{cluster_name}")
+    @Operation(summary = "클러스터 생성(Zolang으로부터 제공받은 클러스터)", description = "Zolang으로부터 제공받은 클러스터를 생성")
+    public ResponseDto<?> createCluster(
+            @UserId Long userId,
+            @PathVariable("cluster_name") String clusterName
+    ){
+        return ResponseDto.created(clusterService.createCluster(userId, clusterName));
     }
 
     @GetMapping("")
