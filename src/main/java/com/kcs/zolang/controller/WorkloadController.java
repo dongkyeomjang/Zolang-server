@@ -69,11 +69,11 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getPodListByNamespace(userId, namespace, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/pods/{podName}")
+    @GetMapping("/{cluster_id}/workload/pods/{pod_name}")
     @Operation(summary = "Pod 상세 조회", description = "특정 Pod 상세 조회")
     public ResponseDto<?> getPod(
         @UserId Long userId,
-        @PathVariable(name = "podName") String name,
+        @PathVariable(name = "pod_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -92,11 +92,11 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDeploymentList(userId, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/deployments/{deploymentName}")
+    @GetMapping("/{cluster_id}/workload/deployments/{deployment_name}")
     @Operation(summary = "Deployment 상세 조회", description = "특정 Deployment 상세 조회")
     public ResponseDto<?> getDeploymentDetail(
         @UserId Long userId,
-        @PathVariable(name = "deploymentName") String name,
+        @PathVariable(name = "deployment_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -142,11 +142,11 @@ public class WorkloadController {
         return ResponseDto.ok(podService.getDaemonSetListByNamespace(userId, namespace, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/daemons/{daemonSetName}")
+    @GetMapping("/{cluster_id}/workload/daemons/{daemon_set_name}")
     @Operation(summary = "DaemonSet 상세 조회", description = "특정 DaemonSet 상세 조회")
     public ResponseDto<?> getDaemonSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "daemonSetName") String name,
+        @PathVariable(name = "daemon_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -179,11 +179,11 @@ public class WorkloadController {
             podService.getReplicaSetListByNamespace(userId, namespace, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/replicas/{replicaSetName}")
+    @GetMapping("/{cluster_id}/workload/replicas/{replica_set_name}")
     @Operation(summary = "ReplicaSet 상세 조회", description = "특정 ReplicaSet 상세 조회")
     public ResponseDto<?> getReplicaSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "replicaSetName") String name,
+        @PathVariable(name = "replica_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")
@@ -216,11 +216,11 @@ public class WorkloadController {
             podService.getStatefulSetListByNamespace(userId, namespace, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/workload/statefuls/{statefulSetName}")
+    @GetMapping("/{cluster_id}/workload/statefuls/{stateful_set_name}")
     @Operation(summary = "StatefulSet 상세 조회", description = "특정 StatefulSet 상세 조회")
     public ResponseDto<?> getStatefulSetDetail(
         @UserId Long userId,
-        @PathVariable(name = "statefulSetName") String name,
+        @PathVariable(name = "stateful_set_name") String name,
         @RequestParam(name = "namespace")
         String namespace,
         @PathVariable(name = "cluster_id")

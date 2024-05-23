@@ -13,7 +13,7 @@ public record DeploymentDetailDto(
     @Schema(description = "deployment 리소스")
     DeploymentResourceDto resource,
     @Schema(description = "롤링 업데이트 정책")
-    RolingUpdateStrategyDto rollingUpdateStrategy,
+    RollingUpdateStrategyDto rollingUpdateStrategy,
     @Schema(description = "pod 상태")
     DeploymentPodStatusDto podConditions,
     @Schema(description = "deployment 상태들")
@@ -25,7 +25,7 @@ public record DeploymentDetailDto(
             .metadata(deployment.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(deployment.getMetadata()))
             .resource(DeploymentResourceDto.fromEntity(deployment))
-            .rollingUpdateStrategy(RolingUpdateStrategyDto.fromEntity(deployment))
+            .rollingUpdateStrategy(RollingUpdateStrategyDto.fromEntity(deployment))
             .podConditions(DeploymentPodStatusDto.fromEntity(deployment))
             .condition(deployment.getStatus().getConditions().stream()
                 .map(DeploymentConditionDto::fromEntity).toList())
