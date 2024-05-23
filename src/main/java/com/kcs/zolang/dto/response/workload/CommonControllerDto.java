@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.workload;
 
 import static com.kcs.zolang.utility.MonitoringUtil.DATE_TIME_FORMATTER;
 import static com.kcs.zolang.utility.MonitoringUtil.getAge;

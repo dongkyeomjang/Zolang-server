@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.workload;
 
 import com.kcs.zolang.dto.response.network.ServiceListDto;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
@@ -12,9 +12,9 @@ import lombok.Builder;
 @Schema(name = "CommonControllerDetailDto", description = "컨트롤러 상세 Dto")
 public record CommonControllerDetailDto(
     @Schema(description = "컨트롤러 메타데이터 Dto")
-    CommonMetadataDto commonControllerDto,
+    CommonMetadataDto metadata,
     @Schema(description = "컨트롤러 리소스 Dto")
-    CommonControllerResourceDto commonControllerResourceDto,
+    CommonControllerResourceDto resource,
     @Schema(description = "pod 상태")
     CommonControllerPodStatusDto podConditions,
     @Schema(description = "해당 컨트롤러 파드 정보")
@@ -27,9 +27,9 @@ public record CommonControllerDetailDto(
         List<PodSimpleDto> pods,
         List<ServiceListDto> services) {
         return CommonControllerDetailDto.builder()
-            .commonControllerDto(daemonSet.getMetadata() == null ? null
+            .metadata(daemonSet.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(daemonSet.getMetadata()))
-            .commonControllerResourceDto(CommonControllerResourceDto.fromEntity(daemonSet))
+            .resource(CommonControllerResourceDto.fromEntity(daemonSet))
             .podConditions(CommonControllerPodStatusDto.fromEntity(daemonSet))
             .pods(pods)
             .services(services)
@@ -39,9 +39,9 @@ public record CommonControllerDetailDto(
     public static CommonControllerDetailDto fromEntity(V1StatefulSet statefulSet,
         List<PodSimpleDto> pods) {
         return CommonControllerDetailDto.builder()
-            .commonControllerDto(statefulSet.getMetadata() == null ? null
+            .metadata(statefulSet.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(statefulSet.getMetadata()))
-            .commonControllerResourceDto(CommonControllerResourceDto.fromEntity(statefulSet))
+            .resource(CommonControllerResourceDto.fromEntity(statefulSet))
             .podConditions(CommonControllerPodStatusDto.fromEntity(statefulSet))
             .pods(pods)
             .services(null)
@@ -51,9 +51,9 @@ public record CommonControllerDetailDto(
     public static CommonControllerDetailDto fromEntity(V1ReplicaSet replicaSet,
         List<PodSimpleDto> pods, List<ServiceListDto> services) {
         return CommonControllerDetailDto.builder()
-            .commonControllerDto(replicaSet.getMetadata() == null ? null
+            .metadata(replicaSet.getMetadata() == null ? null
                 : CommonMetadataDto.fromEntity(replicaSet.getMetadata()))
-            .commonControllerResourceDto(CommonControllerResourceDto.fromEntity(replicaSet))
+            .resource(CommonControllerResourceDto.fromEntity(replicaSet))
             .podConditions(CommonControllerPodStatusDto.fromEntity(replicaSet))
             .pods(pods)
             .services(services)

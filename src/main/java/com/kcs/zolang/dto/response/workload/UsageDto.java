@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.workload;
 
 import io.kubernetes.client.custom.PodMetrics;
 import io.kubernetes.client.custom.Quantity;
