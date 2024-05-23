@@ -44,7 +44,6 @@ public record CommonControllerDetailDto(
             .commonControllerResourceDto(CommonControllerResourceDto.fromEntity(statefulSet))
             .podConditions(CommonControllerPodStatusDto.fromEntity(statefulSet))
             .pods(pods)
-            .services(null)
             .build();
     }
 
