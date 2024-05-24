@@ -5,6 +5,7 @@ import com.kcs.zolang.dto.response.workload.CommonControllerDetailDto;
 import com.kcs.zolang.dto.response.workload.CommonControllerDto;
 import com.kcs.zolang.dto.response.workload.ControllerCronJobDto;
 import com.kcs.zolang.dto.response.workload.DeploymentDetailDto;
+import com.kcs.zolang.dto.response.workload.JobSimpleDto;
 import com.kcs.zolang.dto.response.workload.PodControlledDto;
 import com.kcs.zolang.dto.response.workload.PodDetailDto;
 import com.kcs.zolang.dto.response.workload.PodListDto;
@@ -368,24 +369,24 @@ public class WorkloadService {
         }
     }
 
-    public List<CommonControllerDto> getJobList(Long userId, Long clusterId) {
+    public List<JobSimpleDto> getJobList(Long userId, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
             return batchV1Api.listJobForAllNamespaces().execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+                .getItems().stream().map(JobSimpleDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getJobListByNamespace(Long userId, String namespace,
+    public List<JobSimpleDto> getJobListByNamespace(Long userId, String namespace,
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
             return batchV1Api.listNamespacedJob(namespace).execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+                .getItems().stream().map(JobSimpleDto::fromEntity).toList();
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
