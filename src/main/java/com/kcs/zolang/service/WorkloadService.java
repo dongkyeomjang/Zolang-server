@@ -236,11 +236,8 @@ public class WorkloadService {
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
-            CoreV1Api coreV1Api = new CoreV1Api();
             AppsV1Api appsV1Api = new AppsV1Api();
             V1DaemonSet daemonSet = appsV1Api.readNamespacedDaemonSet(name, namespace).execute();
-            List<V1Pod> list = coreV1Api.listNamespacedPod(daemonSet.getMetadata().getNamespace())
-                .execute().getItems();
             String kind = "DaemonSet";
             String controllerName = daemonSet.getMetadata().getName();
             String namespaceName = daemonSet.getMetadata().getNamespace();
