@@ -545,7 +545,7 @@ public class WorkloadService {
 
     private List<ServiceListDto> getControllerServiceList(String k8sApp, String namespace) {
         if (k8sApp == null) {
-            return null;
+            return new ArrayList<>();
         }
         CoreV1Api coreV1Api = new CoreV1Api();
         List<V1Service> services = new ArrayList<>();
