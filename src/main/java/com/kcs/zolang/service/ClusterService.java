@@ -2,6 +2,7 @@ package com.kcs.zolang.service;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
+import com.kcs.zolang.dto.request.ClusterVersionRequestDto;
 import com.kcs.zolang.dto.request.RegisterClusterDto;
 import com.kcs.zolang.dto.response.ClusterCreateResponseDto;
 import com.kcs.zolang.dto.response.cluster.ClusterListDto;
@@ -12,6 +13,10 @@ import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
 import com.kcs.zolang.utility.ClusterUtil;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.VersionApi;
+import io.kubernetes.client.openapi.models.*;
+import io.kubernetes.client.util.Config;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,13 +35,8 @@ import com.kcs.zolang.utility.MonitoringUtil;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.openapi.models.V1Node;
-import io.kubernetes.client.openapi.models.V1NodeCondition;
-import io.kubernetes.client.openapi.models.V1NodeList;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
@@ -63,6 +63,13 @@ public class ClusterService {
     @Value("${aws.security-group}")
     private String securityGroupId;
 
+    public String getVersion(ClusterVersionRequestDto clusterVersionRequestDto) throws ApiException {
+        ApiClient client = Config.fromToken("https://" + clusterVersionRequestDto.domainUrl(),
+                clusterVersionRequestDto.secretToken(), false);
+        Configuration.setDefaultApiClient(client);
+        VersionApi versionApi = new VersionApi(client);
+        return versionApi.getCode().execute().getGitVersion();
+    }
     @Transactional
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
         // 클러스터를 EKS에 생성
@@ -135,7 +142,7 @@ public class ClusterService {
                         .build())
                 .scalingConfig(NodegroupScalingConfig.builder()
                         .minSize(2)
-                        .maxSize(4)
+                        .maxSize(2)
                         .desiredSize(2)
                         .build())
                 .build();

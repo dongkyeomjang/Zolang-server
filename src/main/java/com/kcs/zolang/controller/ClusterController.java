@@ -2,8 +2,10 @@ package com.kcs.zolang.controller;
 
 import com.kcs.zolang.annotation.UserId;
 import com.kcs.zolang.dto.global.ResponseDto;
+import com.kcs.zolang.dto.request.ClusterVersionRequestDto;
 import com.kcs.zolang.dto.request.RegisterClusterDto;
 import com.kcs.zolang.service.ClusterService;
+import io.kubernetes.client.openapi.ApiException;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +19,12 @@ import java.io.IOException;
 @Tag(name = "Monitoring-cluster API", description = "모니터링-클러스터 API")
 public class ClusterController {
     private final ClusterService clusterService;
+
+    @GetMapping("/version")
+    @Operation(summary = "클러스터 버전 조회", description = "클러스터 버전을 조회합니다.")
+    public ResponseDto<?> getVersion(@RequestBody ClusterVersionRequestDto clusterVersionRequestDto) throws ApiException {
+        return ResponseDto.ok(clusterService.getVersion(clusterVersionRequestDto));
+    }
 
     @PostMapping("")
     @Operation(summary = "클러스터 등록", description = "사용자의 클러스터를 등록")
