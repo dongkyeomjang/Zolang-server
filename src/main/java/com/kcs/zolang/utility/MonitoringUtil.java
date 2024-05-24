@@ -4,8 +4,8 @@ import static io.kubernetes.client.extended.kubectl.Kubectl.top;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
-import com.kcs.zolang.dto.response.UsageDto;
 import com.kcs.zolang.dto.response.UserUrlTokenDto;
+import com.kcs.zolang.dto.response.workload.UsageDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;

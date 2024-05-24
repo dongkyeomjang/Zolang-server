@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.workload;
 
 import java.io.Serializable;
 import lombok.Builder;

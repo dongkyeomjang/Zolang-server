@@ -2,7 +2,7 @@ package com.kcs.zolang.controller;
 
 import com.kcs.zolang.annotation.UserId;
 import com.kcs.zolang.dto.global.ResponseDto;
-import com.kcs.zolang.dto.response.PodListDto;
+import com.kcs.zolang.dto.response.workload.PodListDto;
 import com.kcs.zolang.service.WorkloadService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;

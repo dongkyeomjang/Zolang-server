@@ -1,4 +1,4 @@
-package com.kcs.zolang.dto.response;
+package com.kcs.zolang.dto.response.workload;
 
 import io.kubernetes.client.openapi.models.V1DaemonSet;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;

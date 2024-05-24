@@ -1,17 +1,17 @@
 package com.kcs.zolang.service;
 
-import com.kcs.zolang.dto.response.CommonControllerDetailDto;
-import com.kcs.zolang.dto.response.CommonControllerDto;
-import com.kcs.zolang.dto.response.ControllerCronJobDto;
-import com.kcs.zolang.dto.response.DeploymentDetailDto;
-import com.kcs.zolang.dto.response.PodControlledDto;
-import com.kcs.zolang.dto.response.PodDetailDto;
-import com.kcs.zolang.dto.response.PodListDto;
-import com.kcs.zolang.dto.response.PodPersistentVolumeClaimDto;
-import com.kcs.zolang.dto.response.PodSimpleDto;
-import com.kcs.zolang.dto.response.UsageDto;
-import com.kcs.zolang.dto.response.WorkloadOverviewDto;
 import com.kcs.zolang.dto.response.network.ServiceListDto;
+import com.kcs.zolang.dto.response.workload.CommonControllerDetailDto;
+import com.kcs.zolang.dto.response.workload.CommonControllerDto;
+import com.kcs.zolang.dto.response.workload.ControllerCronJobDto;
+import com.kcs.zolang.dto.response.workload.DeploymentDetailDto;
+import com.kcs.zolang.dto.response.workload.PodControlledDto;
+import com.kcs.zolang.dto.response.workload.PodDetailDto;
+import com.kcs.zolang.dto.response.workload.PodListDto;
+import com.kcs.zolang.dto.response.workload.PodPersistentVolumeClaimDto;
+import com.kcs.zolang.dto.response.workload.PodSimpleDto;
+import com.kcs.zolang.dto.response.workload.UsageDto;
+import com.kcs.zolang.dto.response.workload.WorkloadOverviewDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
@@ -235,11 +235,8 @@ public class WorkloadService {
         Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
-            CoreV1Api coreV1Api = new CoreV1Api();
             AppsV1Api appsV1Api = new AppsV1Api();
             V1DaemonSet daemonSet = appsV1Api.readNamespacedDaemonSet(name, namespace).execute();
-            List<V1Pod> list = coreV1Api.listNamespacedPod(daemonSet.getMetadata().getNamespace())
-                .execute().getItems();
             String kind = "DaemonSet";
             String controllerName = daemonSet.getMetadata().getName();
             String namespaceName = daemonSet.getMetadata().getNamespace();
