@@ -7,6 +7,7 @@ import com.kcs.zolang.dto.response.workload.CommonControllerListDto;
 import com.kcs.zolang.dto.response.workload.ControllerCronJobDto;
 import com.kcs.zolang.dto.response.workload.CronJobListDto;
 import com.kcs.zolang.dto.response.workload.DeploymentDetailDto;
+import com.kcs.zolang.dto.response.workload.JobListDto;
 import com.kcs.zolang.dto.response.workload.JobSimpleDto;
 import com.kcs.zolang.dto.response.workload.PodControlledDto;
 import com.kcs.zolang.dto.response.workload.PodDetailDto;
@@ -29,6 +30,7 @@ import io.kubernetes.client.openapi.models.V1DaemonSetList;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1DeploymentList;
 import io.kubernetes.client.openapi.models.V1Job;
+import io.kubernetes.client.openapi.models.V1JobList;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
@@ -471,24 +473,38 @@ public class WorkloadService {
         }
     }
 
-    public List<JobSimpleDto> getJobList(Long userId, Long clusterId, String continueToken) {
+    public JobListDto getJobList(Long userId, Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
-            return batchV1Api.listJobForAllNamespaces().execute()
-                .getItems().stream().map(JobSimpleDto::fromEntity).toList();
+            V1JobList jobList = batchV1Api.listJobForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<JobSimpleDto> jobSimpleDto = jobList.getItems().stream()
+                .map(JobSimpleDto::fromEntity).toList();
+            List<String> names = batchV1Api.listJobForAllNamespaces().execute().getItems().stream()
+                .map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, jobSimpleDto.get(0).name());
+            return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
+                startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<JobSimpleDto> getJobListByNamespace(Long userId, String namespace,
+    public JobListDto getJobListByNamespace(Long userId, String namespace,
         Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
-            return batchV1Api.listNamespacedJob(namespace).execute()
-                .getItems().stream().map(JobSimpleDto::fromEntity).toList();
+            V1JobList jobList = batchV1Api.listNamespacedJob(namespace).limit(10)
+                ._continue(continueToken).execute();
+            List<JobSimpleDto> jobSimpleDto = jobList.getItems().stream()
+                .map(JobSimpleDto::fromEntity).toList();
+            List<String> names = batchV1Api.listNamespacedJob(namespace).execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, jobSimpleDto.get(0).name());
+            return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
+                startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
