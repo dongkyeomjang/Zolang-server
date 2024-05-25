@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.util.Config;
 import java.text.DecimalFormat;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -83,6 +84,17 @@ public class MonitoringUtil {
         }
         int digitGroups = (int) (Math.log10(bytes) / Math.log10(1024));
         return decimalFormat.format(bytes / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
+    }
+
+    public static String getDuration(Duration duration) {
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + "s";
+        } else if (seconds < 3600) {
+            return seconds / 60 + "m";
+        } else {
+            return seconds / 3600 + "h";
+        }
     }
 
     public ApiClient getV1Api(Long userId, Long clusterId) {
