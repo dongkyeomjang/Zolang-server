@@ -20,7 +20,7 @@ import org.springframework.web.bind.annotation.RestController;
 public class NamespaceController {
     private final NamespaceService namespaceService;
 
-    @GetMapping("/{cluster_id}/namespace")
+    @GetMapping("/{cluster_id}")
     @Operation(summary="Namespace-category 조회", description = "특정 클러스터안의 네임스페이스 카테고리 출력")
     public ResponseDto<?> getNamespaceCategory(
             @UserId Long userId,
