@@ -5,14 +5,15 @@ import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.request.ClusterVersionRequestDto;
 import com.kcs.zolang.dto.request.RegisterClusterDto;
 import com.kcs.zolang.dto.response.ClusterCreateResponseDto;
-import com.kcs.zolang.dto.response.cluster.ClusterListDto;
-import com.kcs.zolang.dto.response.cluster.ClusterNodeDetailDto;
-import com.kcs.zolang.dto.response.cluster.ClusterNodeListDto;
+import com.kcs.zolang.dto.response.cluster.*;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
 import com.kcs.zolang.utility.ClusterUtil;
+import io.kubernetes.client.Metrics;
+import io.kubernetes.client.custom.NodeMetrics;
+import io.kubernetes.client.custom.NodeMetricsList;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.VersionApi;
 import io.kubernetes.client.openapi.models.*;
@@ -28,6 +29,8 @@ import software.amazon.awssdk.services.ec2.model.RequestLaunchTemplateData;
 import software.amazon.awssdk.services.eks.EksClient;
 import software.amazon.awssdk.services.eks.model.*;
 import java.io.IOException;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -190,12 +193,14 @@ public class ClusterService {
                 .getId();
     }
 
+
     public List<ClusterListDto> getClusters(Long userId) {
         return clusterRepository.findByUserId(userId).stream() // 사용자가 웹서비스에 등록해놓은 클러스터 리스트 가져와서
                 .map(ClusterListDto::fromEntity) // ClusterListDto로 변환하고
                 .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
     }
 
+    //현재 클러스터 상태
     public Boolean getClusterStatus(Long userId, Long clusterId) throws Exception {
 
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
@@ -224,25 +229,39 @@ public class ClusterService {
         }
     }
 
-    public List<ClusterNodeListDto> getClusterNodeList(Long userId, Long clusterId) throws Exception {
+    //노드 사용량
+    private NodeUsageDto getNodeUsage(NodeMetrics nodeMetrics) {
+        return NodeUsageDto.fromEntity(nodeMetrics, LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
+    }
 
+    //노드 리스트
+    public List<ClusterNodeListDto> getClusterNodeList(Long userId, Long clusterId) throws Exception {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
         CoreV1Api coreV1Api = new CoreV1Api(client);
+        Metrics metricsApi = new Metrics(client);
 
         try {
             V1NodeList nodeList = coreV1Api.listNode().execute();
             List<V1Node> nodes = nodeList.getItems();
+            NodeMetricsList metricsList = metricsApi.getNodeMetrics();
 
             List<ClusterNodeListDto> nodeListDtos = nodes.stream()
-                    .map(ClusterNodeListDto::fromEntity)
+                    .map(node -> {
+                        NodeMetrics nodeMetrics = metricsList.getItems().stream()
+                                .filter(metric -> metric.getMetadata().getName().equals(node.getMetadata().getName()))
+                                .findFirst()
+                                .orElse(null);
+                        NodeUsageDto usage = nodeMetrics != null ? getNodeUsage(nodeMetrics) : null;
+                        return ClusterNodeListDto.fromEntity(node, usage);
+                    })
                     .collect(Collectors.toList());
             return nodeListDtos;
         } catch (ApiException e) {
-            //오류 코드 수정 예정
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
+    //노드 디테일
     public List<ClusterNodeDetailDto> getClusterNodeDetail(Long userId, Long clusterId, String nodeName) throws Exception {
         ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
         CoreV1Api coreV1Api = new CoreV1Api(client);
@@ -264,4 +283,105 @@ public class ClusterService {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
+
+    //클러스터 사용량(노드 합)
+    public ClusterStatusDto getClusterUsage(Long userId, Long clusterId) throws Exception {
+        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+        CoreV1Api coreV1Api = new CoreV1Api(client);
+        Metrics metricsApi = new Metrics(client);
+
+        try {
+            V1NodeList nodeList = coreV1Api.listNode().execute();
+            List<V1Node> nodes = nodeList.getItems();
+            List<V1Pod> podList = coreV1Api.listPodForAllNamespaces().execute().getItems();
+            NodeMetricsList metricsList = metricsApi.getNodeMetrics();
+
+            double totalCpuUsage = 0;
+            double totalCpuAllocatable = 0;
+            double totalCpuCapacity = 0;
+            long totalMemoryUsage = 0;
+            long totalMemoryAllocatable = 0;
+            long totalMemoryCapacity = 0;
+            int totalPodUsage = 0;
+            int totalPodAllocatable = 0;
+            int totalPodCapacity = 0;
+
+            for (V1Node node : nodes) {
+                NodeMetrics nodeMetrics = metricsList.getItems().stream()
+                        .filter(metric -> metric.getMetadata().getName().equals(node.getMetadata().getName()))
+                        .findFirst()
+                        .orElse(null);
+
+                if (nodeMetrics != null) {
+                    NodeUsageDto usage = getNodeUsage(nodeMetrics);
+                    totalCpuUsage += usage.nodeCpuUsage();
+                    totalMemoryUsage += usage.nodeMemoryUsage();
+                }
+
+                totalCpuAllocatable += Double.parseDouble(node.getStatus().getAllocatable().get("cpu").getNumber().toString());
+                totalMemoryAllocatable += node.getStatus().getAllocatable().get("memory").getNumber().longValue();
+                totalPodAllocatable += Integer.parseInt(node.getStatus().getAllocatable().get("pods").getNumber().toString());
+
+                totalCpuCapacity += Double.parseDouble(node.getStatus().getCapacity().get("cpu").getNumber().toString());
+                totalMemoryCapacity += node.getStatus().getCapacity().get("memory").getNumber().longValue();
+                totalPodCapacity += Integer.parseInt(node.getStatus().getCapacity().get("pods").getNumber().toString());
+            }
+
+            //실행중인 파드만 사용량으로
+            totalPodUsage = (int) podList.stream()
+                    .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
+                    .count();
+
+            return ClusterStatusDto.builder()
+                    .cpuUsage(totalCpuUsage)
+                    .cpuAllocatable(totalCpuAllocatable)
+                    .cpuCapacity(totalCpuCapacity)
+                    .memoryUsage(totalMemoryUsage)
+                    .memoryAllocatable(totalMemoryAllocatable)
+                    .memoryCapacity(totalMemoryCapacity)
+                    .podUsage(totalPodUsage)
+                    .podAllocatable(totalPodAllocatable)
+                    .podCapacity(totalPodCapacity)
+                    .build();
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+
+    //각 노드 사용량
+    public List<ClusterNodeSimpleDto> getClusterNodeSimpleStatus(Long userId, Long clusterId, String nodeName) throws Exception {
+        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+        CoreV1Api coreV1Api = new CoreV1Api(client);
+        Metrics metricsApi = new Metrics(client);
+
+        try {
+            V1NodeList nodeList = coreV1Api.listNode().execute();
+            List<V1Node> nodes = nodeList.getItems();
+            NodeMetricsList metricsList = metricsApi.getNodeMetrics();
+            List<ClusterNodeSimpleDto> clusterNodeSimpleDtos = new ArrayList<>();
+
+            for (V1Node node : nodes) {
+                if (node.getMetadata().getName().equals(nodeName)) {
+                    NodeMetrics nodeMetrics = metricsList.getItems().stream()
+                            .filter(metric -> metric.getMetadata().getName().equals(node.getMetadata().getName()))
+                            .findFirst()
+                            .orElse(null);
+                    NodeUsageDto usage = nodeMetrics != null ? getNodeUsage(nodeMetrics) : null;
+                    ClusterNodeListDto nodeListDto = ClusterNodeListDto.fromEntity(node, usage);
+                    clusterNodeSimpleDtos.add(ClusterNodeSimpleDto.fromEntity(nodeListDto));
+                }
+            }
+
+            if (clusterNodeSimpleDtos.isEmpty()) {
+                throw new CommonException(ErrorCode.NOT_FOUND_NETWORK);
+            }
+            return clusterNodeSimpleDtos;
+        } catch (ApiException e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
+
+
 }
