@@ -303,4 +303,15 @@ public class WorkloadController {
         return ResponseDto.ok(
             podService.getJobListByNamespace(userId, namespace, clusterId, continueToken));
     }
+
+    @GetMapping("/{cluster_id}/workload/controller/{pod_name}")
+    @Operation(summary = "Pod 사용량 조회", description = "특정 Pod 사용량 조회")
+    public ResponseDto<?> getPodUsage(
+        @UserId Long userId,
+        @PathVariable(name = "pod_name") String name,
+        @PathVariable(name = "cluster_id")
+        Long clusterId
+    ) {
+        return ResponseDto.ok(podService.getControllerPodMetrics(userId, name, clusterId));
+    }
 }
