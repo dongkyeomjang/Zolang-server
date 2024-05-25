@@ -3,7 +3,9 @@ package com.kcs.zolang.service;
 import com.kcs.zolang.dto.response.network.ServiceListDto;
 import com.kcs.zolang.dto.response.workload.CommonControllerDetailDto;
 import com.kcs.zolang.dto.response.workload.CommonControllerDto;
+import com.kcs.zolang.dto.response.workload.CommonControllerListDto;
 import com.kcs.zolang.dto.response.workload.ControllerCronJobDto;
+import com.kcs.zolang.dto.response.workload.CronJobListDto;
 import com.kcs.zolang.dto.response.workload.DeploymentDetailDto;
 import com.kcs.zolang.dto.response.workload.PodControlledDto;
 import com.kcs.zolang.dto.response.workload.PodDetailDto;
@@ -20,14 +22,20 @@ import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.BatchV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1CronJob;
+import io.kubernetes.client.openapi.models.V1CronJobList;
 import io.kubernetes.client.openapi.models.V1DaemonSet;
+import io.kubernetes.client.openapi.models.V1DaemonSetList;
 import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1DeploymentList;
 import io.kubernetes.client.openapi.models.V1Job;
 import io.kubernetes.client.openapi.models.V1OwnerReference;
 import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.openapi.models.V1ReplicaSet;
+import io.kubernetes.client.openapi.models.V1ReplicaSetList;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.openapi.models.V1StatefulSet;
+import io.kubernetes.client.openapi.models.V1StatefulSetList;
 import io.kubernetes.client.openapi.models.V1Volume;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -97,21 +105,28 @@ public class WorkloadService {
         }
     }
 
-    public PodListDto getPodList(Long userId, Long clusterId) {
+    public PodListDto getPodList(Long userId, Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         int m = LocalDateTime.now().getMinute();
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
-            List<V1Pod> podList = coreV1Api.listPodForAllNamespaces().execute().getItems();
-            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList, m);
+            V1PodList podList = coreV1Api.listPodForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList.getItems(),
+                m);
+
             List<String> totalKeys = new ArrayList<>();
             for (int i = 13; i > 0; i--) {
                 totalKeys.add(
                     "cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m - i)) % 60));
             }
-            List<UsageDto> jsonData = getUsage(totalKeys);
-            //모든 네임스페이스의 pod list
-            return PodListDto.fromEntity(jsonData, podSimpleDtoList);
+            List<UsageDto> totalUsage = getUsage(totalKeys);
+            String startName = podList.getItems().get(0).getMetadata().getName();
+            List<String> podNames = coreV1Api.listPodForAllNamespaces().execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(podNames, startName);
+            return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
+                podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -123,16 +138,23 @@ public class WorkloadService {
         try {
             //파드 사용량 추출
             CoreV1Api coreV1Api = new CoreV1Api();
-            List<V1Pod> podList = coreV1Api.listNamespacedPod(namespace).execute().getItems();
-            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList, m);
+            V1PodList podList = coreV1Api.listNamespacedPod(namespace).execute();
+            List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList.getItems(),
+                m);
             List<String> keys = new ArrayList<>();
             for (int i = 13; i > 0; i--) {
                 keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
                     (60 + (m - i)) % 60));
             }
             List<UsageDto> totalUsage = getUsage(keys);
+
+            List<String> podNames = coreV1Api.listNamespacedPod(namespace).execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            String startName = podList.getItems().get(0).getMetadata().getName();
+            int startIndex = getStartIndex(podNames, startName);
             //특정 네임스페이스의 pod list
-            return PodListDto.fromEntity(totalUsage, podSimpleDtoList);
+            return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
+                podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
             throw new RuntimeException(e);
         }
@@ -170,12 +192,22 @@ public class WorkloadService {
         }
     }
 
-    public List<CommonControllerDto> getDeploymentList(Long userId, Long clusterId) {
+    public CommonControllerListDto getDeploymentList(Long userId, Long clusterId,
+        String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listDeploymentForAllNamespaces().execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1DeploymentList deploymentList = appsV1Api.listDeploymentForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllerDto = deploymentList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listDeploymentForAllNamespaces().execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            String startName = commonControllerDto.get(0).name();
+            int startIndex = getStartIndex(names, startName);
+            return CommonControllerListDto.fromEntity(commonControllerDto,
+                deploymentList.getMetadata().getContinue(), startIndex, names.size());
+
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -196,36 +228,63 @@ public class WorkloadService {
         }
     }
 
-    public List<CommonControllerDto> getDeploymentListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+    public CommonControllerListDto getDeploymentListByNamespace(Long userId, String namespace,
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listNamespacedDeployment(namespace).execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1DeploymentList deploymentList = appsV1Api.listNamespacedDeployment(namespace)
+                .limit(10)._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = deploymentList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listNamespacedDeployment(namespace).execute().getItems()
+                .stream()
+                .map(it -> it.getMetadata().getName()).toList();
+            String startName = commonControllers.get(0).name();
+            int startIndex = getStartIndex(names, startName);
+            return CommonControllerListDto.fromEntity(commonControllers,
+                deploymentList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getDaemonSetList(Long userId, Long clusterId) {
+    public CommonControllerListDto getDaemonSetList(Long userId, Long clusterId,
+        String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listDaemonSetForAllNamespaces().execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1DaemonSetList daemonSetList = appsV1Api.listDaemonSetForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = daemonSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listDaemonSetForAllNamespaces().execute().getItems()
+                .stream()
+                .map(it -> it.getMetadata().getName()).toList();
+            String startName = commonControllers.get(0).name();
+            int startIndex = getStartIndex(names, startName);
+            return CommonControllerListDto.fromEntity(commonControllers,
+                daemonSetList.getMetadata().getContinue(), startIndex, commonControllers.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getDaemonSetListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+    public CommonControllerListDto getDaemonSetListByNamespace(Long userId, String namespace,
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listNamespacedDaemonSet(namespace).execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1DaemonSetList daemonSetList = appsV1Api.listNamespacedDaemonSet(namespace).limit(10)
+                ._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = daemonSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listNamespacedDaemonSet(namespace).execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            String startName = commonControllers.get(0).name();
+            int startIndex = getStartIndex(names, startName);
+            return CommonControllerListDto.fromEntity(commonControllers,
+                daemonSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -254,24 +313,40 @@ public class WorkloadService {
         }
     }
 
-    public List<CommonControllerDto> getReplicaSetList(Long userId, Long clusterId) {
+    public CommonControllerListDto getReplicaSetList(Long userId, Long clusterId,
+        String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listReplicaSetForAllNamespaces().execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1ReplicaSetList replicaSetList = appsV1Api.listReplicaSetForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = replicaSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listReplicaSetForAllNamespaces().execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, commonControllers.get(0).name());
+            return CommonControllerListDto.fromEntity(commonControllers,
+                replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getReplicaSetListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+    public CommonControllerListDto getReplicaSetListByNamespace(Long userId, String namespace,
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listNamespacedReplicaSet(namespace).execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1ReplicaSetList replicaSetList = appsV1Api.listNamespacedReplicaSet(namespace)
+                .limit(10)._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = replicaSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listNamespacedReplicaSet(namespace).execute().getItems()
+                .stream()
+                .map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, commonControllers.get(0).name());
+            return CommonControllerListDto.fromEntity(commonControllers,
+                replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -300,24 +375,39 @@ public class WorkloadService {
         }
     }
 
-    public List<CommonControllerDto> getStatefulSetList(Long userId, Long clusterId) {
+    public CommonControllerListDto getStatefulSetList(Long userId, Long clusterId,
+        String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listStatefulSetForAllNamespaces().execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1StatefulSetList statefulSetList = appsV1Api.listStatefulSetForAllNamespaces()
+                .limit(10)._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = statefulSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listStatefulSetForAllNamespaces().execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, commonControllers.get(0).name());
+            return CommonControllerListDto.fromEntity(commonControllers,
+                statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getStatefulSetListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+    public CommonControllerListDto getStatefulSetListByNamespace(Long userId, String namespace,
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             AppsV1Api appsV1Api = new AppsV1Api();
-            return appsV1Api.listNamespacedStatefulSet(namespace).execute()
-                .getItems().stream().map(CommonControllerDto::fromEntity).toList();
+            V1StatefulSetList statefulSetList = appsV1Api.listNamespacedStatefulSet(namespace)
+                .limit(10)._continue(continueToken).execute();
+            List<CommonControllerDto> commonControllers = statefulSetList.getItems().stream()
+                .map(CommonControllerDto::fromEntity).toList();
+            List<String> names = appsV1Api.listNamespacedStatefulSet(namespace).execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, commonControllers.get(0).name());
+            return CommonControllerListDto.fromEntity(commonControllers,
+                statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
@@ -342,30 +432,45 @@ public class WorkloadService {
         }
     }
 
-    public List<ControllerCronJobDto> getCronJobList(Long userId, Long clusterId) {
+    public CronJobListDto getCronJobList(Long userId, Long clusterId,
+        String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
-            return batchV1Api.listCronJobForAllNamespaces().execute()
-                .getItems().stream().map(ControllerCronJobDto::fromEntity).toList();
+            V1CronJobList cronJobList = batchV1Api.listCronJobForAllNamespaces().limit(10)
+                ._continue(continueToken).execute();
+            List<ControllerCronJobDto> cronJobs = cronJobList.getItems().stream()
+                .map(ControllerCronJobDto::fromEntity).toList();
+            List<String> names = batchV1Api.listCronJobForAllNamespaces().execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, cronJobs.get(0).name());
+            return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
+                startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<ControllerCronJobDto> getCronJobListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+    public CronJobListDto getCronJobListByNamespace(Long userId, String namespace,
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
-            return batchV1Api.listNamespacedCronJob(namespace).execute()
-                .getItems().stream().map(ControllerCronJobDto::fromEntity).toList();
+            V1CronJobList cronJobList = batchV1Api.listNamespacedCronJob(namespace).limit(10)
+                ._continue(continueToken).execute();
+            List<ControllerCronJobDto> cronJobs = cronJobList.getItems().stream()
+                .map(ControllerCronJobDto::fromEntity).toList();
+            List<String> names = batchV1Api.listNamespacedCronJob(namespace).execute().getItems()
+                .stream().map(it -> it.getMetadata().getName()).toList();
+            int startIndex = getStartIndex(names, cronJobs.get(0).name());
+            return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
+                startIndex, names.size());
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
-    public List<CommonControllerDto> getJobList(Long userId, Long clusterId) {
+    public List<CommonControllerDto> getJobList(Long userId, Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
@@ -377,7 +482,7 @@ public class WorkloadService {
     }
 
     public List<CommonControllerDto> getJobListByNamespace(Long userId, String namespace,
-        Long clusterId) {
+        Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
         try {
             BatchV1Api batchV1Api = new BatchV1Api();
@@ -565,8 +670,14 @@ public class WorkloadService {
         return services.stream().map(ServiceListDto::fromEntity).toList();
     }
 
-    private String getTime(int m) {
-        int h = LocalDateTime.now().getHour();
-        return h + ":" + (m < 10 ? "0" + m : m);
+    private Integer getStartIndex(List<String> names, String startName) {
+        int startCount = 1;
+        for (String name : names) {
+            if (name.equals(startName)) {
+                break;
+            }
+            startCount++;
+        }
+        return startCount;
     }
 }

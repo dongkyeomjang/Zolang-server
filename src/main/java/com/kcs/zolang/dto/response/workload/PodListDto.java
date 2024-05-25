@@ -8,13 +8,22 @@ import lombok.Builder;
 @Schema(name = "PodListDto", description = "총 사용량과 Pod 목록 Dto")
 public record PodListDto(
     List<UsageDto> totalUsage,
-    List<PodSimpleDto> pods
+    List<PodSimpleDto> pods,
+    int total,
+    int start,
+    int end,
+    String continueToken
 ) {
 
-    public static PodListDto fromEntity(List<UsageDto> totalUsage, List<PodSimpleDto> pods) {
+    public static PodListDto fromEntity(List<UsageDto> totalUsage, List<PodSimpleDto> pods,
+        String continueToken, int start, int total) {
         return PodListDto.builder()
             .totalUsage(totalUsage)
             .pods(pods)
+            .total(total)
+            .start(start)
+            .end(start + pods.size() - 1)
+            .continueToken(continueToken)
             .build();
     }
 }
