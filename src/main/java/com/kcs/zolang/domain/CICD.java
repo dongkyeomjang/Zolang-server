@@ -26,23 +26,18 @@ public class CICD {
     @Column(name = "repository_name", nullable = false)
     private String repositoryName;
 
-    @Column(name = "branch_name", nullable = false)
-    private String branchName;
-
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public CICD(User user, String repositoryName, String branchName) {
+    public CICD(User user, String repositoryName) {
         this.user = user;
         this.repositoryName = repositoryName;
         this.createdAt = LocalDateTime.now();
-        this.branchName = branchName;
     }
 
-    public void update(String repositoryName, String branchName) {
+    public void update(String repositoryName) {
         this.repositoryName = repositoryName;
-        this.branchName = branchName;
     }
 }
