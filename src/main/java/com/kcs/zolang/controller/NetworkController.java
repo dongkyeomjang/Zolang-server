@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/api/v1/network")
+@RequestMapping("/api/v1/cluster")
 @Validated
 @Tag(name="Monitoring-Network API", description="모니터링-네트워크 API")
 public class NetworkController {
     private final NetworkService networkService;
 
-    @GetMapping("/{cluster_id}/service")
+    @GetMapping("/{cluster_id}/network/service")
     @Operation(summary = "Network-service 목록 조회", description = "사용자의 네트워크-서비스 목록 조회")
     public ResponseDto<?> getServiceList(
             @UserId Long userId,
@@ -28,8 +28,8 @@ public class NetworkController {
         return ResponseDto.ok(networkService.getServiceList(userId, clusterId));
     }
 
-    @GetMapping("/{cluster_id}/service/namespace")
-    @Operation(summary = "Network-service 목록 조회", description = "사용자의 네트워크-서비스 특정 네임스페이스 목록 조회")
+    @GetMapping("/{cluster_id}/network/service/namespace")
+    @Operation(summary = "특정 카테고리 Network-service 목록 조회", description = "사용자의 네트워크-서비스 특정 네임스페이스 목록 조회")
     public ResponseDto<?> getServiceNameList(
             @UserId Long userId,
             @RequestParam(name="namespace") String namespace,
@@ -38,8 +38,8 @@ public class NetworkController {
         return ResponseDto.ok(networkService.getServiceNameList(userId, clusterId, namespace));
     }
 
-    @GetMapping("/{cluster_id}/service/{service_name}")
-    @Operation(summary = "Network-service 목록 조회", description = "사용자의 네트워크-서비스 상세 조회")
+    @GetMapping("/{cluster_id}/network/service/{service_name}")
+    @Operation(summary = "Network-service 상세 조회", description = "사용자의 네트워크-서비스 상세 조회")
     public ResponseDto<?> getServiceDetail(
             @UserId Long userId,
             @PathVariable(name = "cluster_id") Long clusterId,
