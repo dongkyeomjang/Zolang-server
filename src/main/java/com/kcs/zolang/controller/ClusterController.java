@@ -79,4 +79,23 @@ public class ClusterController {
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodeDetail(userId, clusterId, nodeName));
     }
+
+    @GetMapping("/{cluster_id}/usage")
+    @Operation(summary = "cluster 사용량 ", description = "등록된 클러스터 사용량 조회")
+    public ResponseDto<?> getClusterUsage(
+            @UserId Long userId,
+            @PathVariable("cluster_id") Long clusterId
+    ) throws Exception {
+        return ResponseDto.ok(clusterService.getClusterUsage(userId, clusterId));
+    }
+
+    @GetMapping("/{cluster_id}/usage/{node_name}")
+    @Operation(summary = "Cluster-node 사용량 조회", description = "사용자 클러스터-노드 사용량 조회")
+    public ResponseDto<?> getClusterNodeSimpleStatus(
+            @UserId Long userId,
+            @PathVariable(name = "cluster_id") Long clusterId,
+            @PathVariable(name = "node_name") String nodeName
+    ) throws Exception {
+        return ResponseDto.ok(clusterService.getClusterNodeSimpleStatus(userId, clusterId, nodeName));
+    }
 }
