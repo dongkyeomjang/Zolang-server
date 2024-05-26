@@ -10,7 +10,9 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.KubeConfig;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.stereotype.Component;
 
 import java.io.BufferedReader;
 import java.io.IOException;
@@ -20,48 +22,50 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
-
+@Slf4j
+@Component
 public class ClusterUtil {
 
     @Value("${aws.account.id}")
-    private static String awsAccountId;
-
+    private String awsAccountId;
     @Value("${aws.region}")
-    private static String awsRegion;
-
+    private String awsRegion;
     @Value("${aws.ecr.repository.prefix}")
-    private static String ecrRepositoryPrefix;
+    private String ecrRepositoryPrefix;
 
-    private static ApiClient buildApiClient(String kubeConfigContent) throws IOException {
+    private ApiClient buildApiClient(String kubeConfigContent) throws IOException {
         KubeConfig config = KubeConfig.loadKubeConfig(new StringReader(kubeConfigContent));
         return ClientBuilder.kubeconfig(config).build();
     }
 
-    public static void waitForClusterReady(Cluster cluster) {
-        try {
-            // 클러스터가 준비될 때까지 대기
-            ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c",
-                    "aws eks wait cluster-active --name " + cluster.getClusterName());
-            Process process = processBuilder.start();
-            process.waitFor(10, TimeUnit.MINUTES);
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to wait for cluster to be ready", e);
-        }
-    }
-
-    public static void createKubeconfig(Cluster cluster) {
+    public void createKubeconfig(Cluster cluster) {
         String command = String.format("aws eks update-kubeconfig --name %s --region %s", cluster.getClusterName(), awsRegion);
 
         try {
+            log.info("createKubeconfig 진입");
             ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
+            log.info("processBuilder 생성");
+            log.info("환경변수 설정 완료 AWS_ACCESS_KEY_ID : {}, AWS_SECRET_ACCESS : {}",System.getenv("AWS_ACCESS_KEY_ID"), System.getenv("AWS_SECRET_ACCESS_KEY"));
             processBuilder.environment().put("AWS_ACCESS_KEY_ID", System.getenv("AWS_ACCESS_KEY_ID"));
             processBuilder.environment().put("AWS_SECRET_ACCESS_KEY", System.getenv("AWS_SECRET_ACCESS_KEY"));
+            log.info("환경변수 설정 완료 AWS_ACCESS_KEY_ID : {}, AWS_SECRET_ACCESS : {}", System.getenv("AWS_ACCESS_KEY_ID"), System.getenv("AWS_SECRET_ACCESS_KEY"));
 
             Process process = processBuilder.start();
+            log.info("process 실행");
+
+            // 표준 출력 읽기
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
+            log.info("BufferedReader 생성 (stdout)");
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println(line);
+                log.info("stdout: {}", line);
+            }
+
+            // 에러 출력 읽기
+            BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+            log.info("BufferedReader 생성 (stderr)");
+            while ((line = errorReader.readLine()) != null) {
+                log.error("stderr: {}", line);
             }
 
             int exitCode = process.waitFor();
@@ -69,53 +73,82 @@ public class ClusterUtil {
                 throw new RuntimeException("Failed to update kubeconfig");
             }
 
-            System.out.println("Kubeconfig updated successfully");
+            log.info("Kubeconfig updated successfully");
         } catch (IOException | InterruptedException e) {
+            log.error("Exception occurred while updating kubeconfig", e);
             throw new RuntimeException("Failed to update kubeconfig", e);
         }
     }
 
 
-    public static void createServiceAccountWithKubectl(Cluster cluster) {
+    public void createServiceAccountWithKubectl(Cluster cluster) {
         try {
             String clusterName = cluster.getClusterName();
+            String saName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "sa";
+            String roleName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "role";
+            String roleBindingName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "rolebinding";
+
+            log.info("Creating service account with name: {}", saName);
             // 서비스 계정 생성
-            String saCommand = String.format(
-                    "kubectl create sa %s-sa --namespace default", clusterName);
+            String saCommand = String.format("kubectl create sa %s --namespace default", saName);
+            log.info("Executing command: {}", saCommand);
             executeCommand(saCommand);
 
+            // 시크릿 생성
+            String secretCommand = String.format("kubectl apply -f - <<EOF\n" +
+                    "apiVersion: v1\n" +
+                    "kind: Secret\n" +
+                    "metadata:\n" +
+                    "  name: %s-token\n" +
+                    "  namespace: default\n" +
+                    "  annotations:\n" +
+                    "    kubernetes.io/service-account.name: \"%s\"\n" +
+                    "type: kubernetes.io/service-account-token\n" +
+                    "EOF", saName, saName);
+            log.info("Executing command: {}", secretCommand);
+            executeCommand(secretCommand);
+
             // 역할 생성
-            String roleCommand = String.format(
-                    "kubectl create role %s-role --namespace default --verb=get,list,watch --resource=pods,services,deployments,configmaps,secrets,networkpolicies,workflows", clusterName);
+            String roleCommand = String.format("kubectl create role %s --namespace default --verb=get,list,watch --resource=pods,services,deployments,configmaps,secrets,networkpolicies", roleName);
+            log.info("Executing command: {}", roleCommand);
             executeCommand(roleCommand);
 
             // 역할 바인딩 생성
-            String roleBindingCommand = String.format(
-                    "kubectl create rolebinding %s-rolebinding --namespace default --role=%s-role --serviceaccount=default:%s-sa", clusterName, clusterName, clusterName);
+            String roleBindingCommand = String.format("kubectl create rolebinding %s --namespace default --role=%s --serviceaccount=default:%s", roleBindingName, roleName, saName);
+            log.info("Executing command: {}", roleBindingCommand);
             executeCommand(roleBindingCommand);
         } catch (IOException | InterruptedException e) {
+            log.error("Exception occurred while creating service account and role with kubectl", e);
             throw new RuntimeException("Failed to create service account and role with kubectl", e);
         }
     }
 
-    public static String getServiceAccountTokenWithKubectl(Cluster cluster) {
+    public String getServiceAccountTokenWithKubectl(Cluster cluster) {
         try {
             String clusterName = cluster.getClusterName();
+            String saName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "sa";
+            String secretName = saName + "-token";
+
             // 서비스 계정 토큰을 가져오기 위한 시크릿 이름 가져오기
-            String getSecretNameCommand = String.format(
-                    "kubectl get sa %s-sa --namespace default -o jsonpath='{.secrets[0].name}'", clusterName);
-            String secretName = executeCommandAndGetOutput(getSecretNameCommand);
+            String getSecretNameCommand = String.format("kubectl get secrets --namespace default -o jsonpath=\"{.items[?(@.metadata.annotations['kubernetes\\.io/service-account\\.name']=='%s')].metadata.name}\"", saName);
+            log.info("Executing command: {}", getSecretNameCommand);
+            String actualSecretName = executeCommandAndGetOutput(getSecretNameCommand);
+
+            if (actualSecretName.isEmpty()) {
+                throw new RuntimeException("Failed to get secret name for service account: " + saName);
+            }
 
             // 시크릿 토큰 가져오기
-            String getTokenCommand = String.format(
-                    "kubectl get secret %s --namespace default -o jsonpath='{.data.token}' | base64 --decode", secretName);
+            String getTokenCommand = String.format("kubectl get secret %s --namespace default -o jsonpath='{.data.token}' | base64 -d", actualSecretName);
+            log.info("Executing command: {}", getTokenCommand);
             return executeCommandAndGetOutput(getTokenCommand);
         } catch (IOException | InterruptedException e) {
+            log.error("Exception occurred while getting service account token with kubectl", e);
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
 
-    public static void deployApplication(CICD cicd, Cluster cluster) {
+    public void deployApplication(CICD cicd, Cluster cluster) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
@@ -127,7 +160,7 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to deploy application", e);
         }
     }
-    public static void rolloutDeployment(CICD cicd, Cluster cluster) {
+    public void rolloutDeployment(CICD cicd, Cluster cluster) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
@@ -149,7 +182,7 @@ public class ClusterUtil {
     }
 
 
-    public static void runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
+    public void runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
             executeCommand(String.format("git clone %s", repoUrl));
@@ -174,7 +207,7 @@ public class ClusterUtil {
         }
     }
 
-    private static String generateDeploymentYaml(CICD cicd) {
+    private String generateDeploymentYaml(CICD cicd) {
         String deploymentName = cicd.getRepositoryName();
         String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
                 awsAccountId, awsRegion, ecrRepositoryPrefix, cicd.getRepositoryName());
@@ -201,7 +234,7 @@ public class ClusterUtil {
                         "        - containerPort: 8080\n",
                 deploymentName, deploymentName, deploymentName, deploymentName, imageName);
     }
-    private static String generateKubeConfig(Cluster cluster) {
+    private String generateKubeConfig(Cluster cluster) {
         return String.format(
                 "apiVersion: v1\n" +
                         "clusters:\n" +
@@ -230,13 +263,13 @@ public class ClusterUtil {
                 cluster.getSecretToken()
         );
     }
-    private static void executeCommand(String command) throws IOException, InterruptedException {
+    private void executeCommand(String command) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
         Process process = processBuilder.start();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
             String line;
             while ((line = reader.readLine()) != null) {
-                System.out.println(line);
+                log.info(line);
             }
         }
         int exitCode = process.waitFor();
@@ -245,20 +278,23 @@ public class ClusterUtil {
         }
     }
 
-    private static String executeCommandAndGetOutput(String command) throws IOException, InterruptedException {
+    private String executeCommandAndGetOutput(String command) throws IOException, InterruptedException {
         ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
         Process process = processBuilder.start();
-        String output;
+        StringBuilder output = new StringBuilder();
         try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            output = reader.readLine().trim();
+            String line;
+            while ((line = reader.readLine()) != null) {
+                output.append(line).append("\n");
+            }
         }
         int exitCode = process.waitFor();
         if (exitCode != 0) {
             throw new RuntimeException("Command failed: " + command);
         }
-        return output;
+        return output.toString().trim();
     }
-    private static void applyYamlToCluster(CoreV1Api api, String yaml) {
+    private void applyYamlToCluster(CoreV1Api api, String yaml) {
         try {
             api.createNamespacedPod("default", io.kubernetes.client.util.Yaml.loadAs(yaml, io.kubernetes.client.openapi.models.V1Pod.class));
         } catch (Exception e) {
