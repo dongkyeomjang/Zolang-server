@@ -9,6 +9,7 @@ import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.CICDRepository;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
+import com.kcs.zolang.utility.ClusterUtil;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
@@ -23,8 +24,6 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
 
-import static com.kcs.zolang.utility.ClusterUtil.runPipeline;
-
 @Service
 @RequiredArgsConstructor
 public class CICDService {
@@ -32,6 +31,7 @@ public class CICDService {
     private final UserRepository userRepository;
     private final ClusterRepository clusterRepository;
     private final RestTemplate restTemplate;
+    private final ClusterUtil clusterUtil;
 
     @Value("${github.webhook-url}")
     private String webhookUrl;
@@ -73,7 +73,7 @@ public class CICDService {
                     .repositoryName(requestDto.repoName())
                     .build();
             cicdRepository.save(cicd);
-            runPipeline(cicd, clusterProvidedByZolang, true);
+            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, true);
 
         } catch (HttpClientErrorException e) {
             throw new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK);
@@ -87,6 +87,6 @@ public class CICDService {
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
         CICD cicd = cicdRepository.findByRepositoryName(repoName)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
-        runPipeline(cicd,clusterProvidedByZolang, false);
+        clusterUtil.runPipeline(cicd,clusterProvidedByZolang, false);
     }
 }
