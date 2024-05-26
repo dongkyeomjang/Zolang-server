@@ -15,6 +15,7 @@ import com.kcs.zolang.utility.ClusterUtil;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.ec2.Ec2Client;
 import software.amazon.awssdk.services.ec2.model.CreateLaunchTemplateRequest;
@@ -33,15 +34,14 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeCondition;
 import io.kubernetes.client.openapi.models.V1NodeList;
-import lombok.RequiredArgsConstructor;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class ClusterService {
     private final MonitoringUtil monitoringUtil;
+    private final ClusterUtil clusterUtil;
     private static final Logger log = LoggerFactory.getLogger(NetworkService.class);
     private final ClusterRepository clusterRepository;
     private final UserRepository userRepository;
@@ -60,8 +60,14 @@ public class ClusterService {
     @Value("${aws.subnet.id-2}")
     private String subnetId2;
 
-    @Value("${aws.security-group}")
-    private String securityGroupId;
+    @Value("${aws.security-group.id-1}")
+    private String securityGroupId1;
+
+    @Value("${aws.security-group.id-2}")
+    private String securityGroupId2;
+
+    @Value("${aws.version}")
+    private String version;
 
     @Transactional
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
@@ -71,22 +77,15 @@ public class ClusterService {
                 .roleArn(eksRoleArn)
                 .resourcesVpcConfig(VpcConfigRequest.builder()
                         .subnetIds(subnetId1, subnetId2)
-                        .securityGroupIds(securityGroupId)
+                        .securityGroupIds(securityGroupId1, securityGroupId2)
                         .endpointPublicAccess(true)
                         .endpointPrivateAccess(true)
                         .build())
-                .version("1.21")
+                .version(version)
                 .kubernetesNetworkConfig(config -> config.ipFamily("IPV4").build())
                 .build();
 
-        CreateClusterResponse response = eksClient.createCluster(request);
-        software.amazon.awssdk.services.eks.model.Cluster eksCluster = response.cluster();
-
-        // 노드 그룹 생성
-        createNodeGroup(clusterName, clusterName + "-nodegroup");
-
-        // 클러스터 도메인 URL 가져오기
-        String clusterEndpoint = eksCluster.endpoint();
+        eksClient.createCluster(request);
 
         // 클러스터 정보를 DB에 저장
         Cluster cluster = clusterRepository.save(
@@ -96,25 +95,37 @@ public class ClusterService {
                         .clusterName(clusterName)
                         .provider("zolang")
                         .secretToken("") // 초기에는 빈 값으로 설정
-                        .domainUrl(clusterEndpoint)
-                        .version("1.21")
+                        .domainUrl("") // 초기에는 빈 값으로 설정
+                        .version("") // 초기에는 빈 값으로 설정
                         .build()
         );
 
-        // 클러스터 준비 상태 확인 및 서비스 계정 생성
-        ClusterUtil.waitForClusterReady(cluster);
+        waitForClusterToBeActiveAndCreateNodeGroup(clusterName, clusterName + "-nodegroup");
+
+        // 생성이 완료되면 클러스터 정보를 다시 가져옴
+        DescribeClusterRequest describeClusterRequest = DescribeClusterRequest.builder()
+                .name(clusterName)
+                .build();
+
+        DescribeClusterResponse response = eksClient.describeCluster(describeClusterRequest);
+
+        software.amazon.awssdk.services.eks.model.Cluster eksCluster = response.cluster();
+
 
         // Kubeconfig 파일 생성 및 설정
-        ClusterUtil.createKubeconfig(cluster);
+        clusterUtil.createKubeconfig(cluster);
 
         // 서비스 계정 및 역할 생성
-        ClusterUtil.createServiceAccountWithKubectl(cluster);
+        clusterUtil.createServiceAccountWithKubectl(cluster);
 
         // 서비스 계정 토큰 가져오기
-        String secretToken = ClusterUtil.getServiceAccountTokenWithKubectl(cluster);
+        String secretToken = clusterUtil.getServiceAccountTokenWithKubectl(cluster);
+
+        // 도메인 url에서 https:// 제거
+        String domainUrl = eksCluster.endpoint().replace("https://", "");
 
         // 클러스터 정보 업데이트
-        cluster.update(clusterName, secretToken, clusterEndpoint, "1.21");
+        cluster.update(clusterName, secretToken, domainUrl, version);
         clusterRepository.save(cluster);
 
         return ClusterCreateResponseDto.fromEntity(cluster);
@@ -135,7 +146,7 @@ public class ClusterService {
                         .build())
                 .scalingConfig(NodegroupScalingConfig.builder()
                         .minSize(2)
-                        .maxSize(4)
+                        .maxSize(2)
                         .desiredSize(2)
                         .build())
                 .build();
@@ -143,14 +154,17 @@ public class ClusterService {
     }
 
     private String createLaunchTemplate(String clusterName) {
+        String userDataScript = getUserDataScript(clusterName);
+        String base64UserData = Base64.getEncoder().encodeToString(userDataScript.getBytes());
+
         CreateLaunchTemplateRequest request = CreateLaunchTemplateRequest.builder()
                 .launchTemplateName("eks-launch-template" + UUID.randomUUID())
                 .launchTemplateData(RequestLaunchTemplateData.builder()
                         .imageId("ami-0d989729759ea3477") // Amazon Linux 2 arm64 EKS Optimized AMI ID
-                        .instanceType("t2.medium")
+                        .instanceType("t4g.medium")
                         .keyName("bongousse")
-                        .securityGroupIds(securityGroupId)
-                        .userData(getUserDataScript(clusterName))
+                        .securityGroupIds(securityGroupId1, securityGroupId2)
+                        .userData(base64UserData)
                         .build())
                 .build();
 
@@ -164,6 +178,30 @@ public class ClusterService {
                 "yum update -y\n" +
                 "yum install -y aws-cli\n" +
                 String.format("/etc/eks/bootstrap.sh %s", clusterName);
+    }
+
+    @Async
+    public void waitForClusterToBeActiveAndCreateNodeGroup(String clusterName, String nodegroupName) {
+        try {
+            while (true) {
+                DescribeClusterRequest describeClusterRequest = DescribeClusterRequest.builder()
+                        .name(clusterName)
+                        .build();
+
+                DescribeClusterResponse describeClusterResponse = eksClient.describeCluster(describeClusterRequest);
+                software.amazon.awssdk.services.eks.model.Cluster cluster = describeClusterResponse.cluster();
+
+                if ("ACTIVE".equals(cluster.statusAsString())) {
+                    break;
+                }
+
+                Thread.sleep(30000); // 30초 대기
+            }
+            createNodeGroup(clusterName, nodegroupName);
+        } catch (InterruptedException e) {
+            Thread.currentThread().interrupt();
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
     @Transactional
     public Long registerCluster(Long userId, RegisterClusterDto registerClusterDto) throws IOException {
