@@ -9,7 +9,10 @@ import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.CICDRepository;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
+import com.kcs.zolang.utility.ClusterUtil;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
@@ -22,9 +25,7 @@ import org.springframework.web.client.RestTemplate;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.Map;
-
-import static com.kcs.zolang.utility.ClusterUtil.runPipeline;
-
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class CICDService {
@@ -32,6 +33,8 @@ public class CICDService {
     private final UserRepository userRepository;
     private final ClusterRepository clusterRepository;
     private final RestTemplate restTemplate;
+    private final ClusterUtil clusterUtil;
+    private final StringEncryptor stringEncryptor;
 
     @Value("${github.webhook-url}")
     private String webhookUrl;
@@ -44,7 +47,7 @@ public class CICDService {
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER)); // 우선 클러스터 생성을 한 이후에만 배포 등록이 가능함
 
         String nickname = user.getNickname();
-        String token = user.getGithubAccessToken();
+        String token = stringEncryptor.decrypt(user.getGithubAccessToken());
 
         String apiUrl = String.format("https://api.github.com/repos/%s/%s/hooks", nickname, requestDto.repoName());
         try {
@@ -66,6 +69,10 @@ public class CICDService {
 
             HttpEntity<Map<String, Object>> entity = new HttpEntity<>(body, headers);
 
+            log.info("Sending request to GitHub API to create webhook: {}", apiUrl);
+            log.info("Request headers: {}", headers);
+            log.info("Request body: {}", body);
+
             restTemplate.postForEntity(apiUrl, entity, String.class);
 
             CICD cicd = CICD.builder()
@@ -73,7 +80,7 @@ public class CICDService {
                     .repositoryName(requestDto.repoName())
                     .build();
             cicdRepository.save(cicd);
-            runPipeline(cicd, clusterProvidedByZolang, true);
+            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, true);
 
         } catch (HttpClientErrorException e) {
             throw new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK);
@@ -81,12 +88,16 @@ public class CICDService {
     }
     @Transactional
     public void handleGithubWebhook(Map<String, Object> payload) {
-        String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
-        Long userId = cicdRepository.findByRepositoryName(repoName).get().getUser().getId(); // !!!!동일 리포지토리를 여러명이 등록한 경우 고려 아직 x
-        Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        CICD cicd = cicdRepository.findByRepositoryName(repoName)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
-        runPipeline(cicd,clusterProvidedByZolang, false);
+        try {
+            String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
+            CICD cicd = cicdRepository.findByRepositoryName(repoName)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+            Long userId = cicd.getUser().getId();
+            Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, false);
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
+        }
     }
 }
