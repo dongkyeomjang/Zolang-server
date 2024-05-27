@@ -13,6 +13,18 @@ RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/s
 # 필수 라이브러리 설치
 RUN apk add --no-cache libstdc++ zlib
 
+# 최신 Gradle 설치
+RUN wget https://services.gradle.org/distributions/gradle-8.0.2-bin.zip && \
+    unzip gradle-8.0.2-bin.zip && \
+    mv gradle-8.0.2 /opt/gradle && \
+    ln -s /opt/gradle/bin/gradle /usr/bin/gradle
+
+# Docker CLI 설치
+RUN apk add --no-cache docker-cli
+
+# 도커 데몬 소켓을 볼륨으로 연결
+VOLUME /var/run/docker.sock
+
 # AWS CLI 설치 (x86_64 버전)
 RUN apk add --no-cache bash curl zip unzip && \
     curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip" && \
@@ -25,11 +37,14 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
     chmod +x kubectl && \
     mv kubectl /usr/local/bin/
 
+# Git 설치
+RUN apk add --no-cache git
+
 ARG JAR_PATH=./build/libs
 
 COPY ${JAR_PATH}/Zolang-server-0.0.1-SNAPSHOT.jar ./app.jar
 
-RUN mkdir -p resources/images resources/logs
+RUN mkdir -p resources/repo resources/logs
 
 ENV LD_LIBRARY_PATH=/lib:/usr/lib:/usr/local/lib
 
