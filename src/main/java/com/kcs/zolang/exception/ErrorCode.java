@@ -61,7 +61,9 @@ public enum ErrorCode {
     CLUSTER_REGISTRATION_FAILED(50002, HttpStatus.INTERNAL_SERVER_ERROR, "클러스터 등록에 실패하였습니다."),
     API_ERROR(50003, HttpStatus.INTERNAL_SERVER_ERROR, "API 호출에 실패하였습니다."),
     KUBECTL_ERROR(50004, HttpStatus.INTERNAL_SERVER_ERROR, "Kubectl 명령어 실행에 실패하였습니다."),
-    FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다.");
+    FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다."),
+    PIPELINE_ERROR(50006, HttpStatus.INTERNAL_SERVER_ERROR, "파이프라인 실행에 실패하였습니다."),
+    GRADLE_FILE_ERROR(50007, HttpStatus.INTERNAL_SERVER_ERROR, "그레이들 빌드에 실패하였습니다.");
 
     private final Integer code;
     private final HttpStatus httpStatus;
