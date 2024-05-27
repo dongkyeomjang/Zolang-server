@@ -51,9 +51,11 @@ public class WorkloadController {
     public ResponseDto<PodListDto> getPods(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getPodList(userId, clusterId));
+        return ResponseDto.ok(podService.getPodList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/pods/namespace")
@@ -87,9 +89,11 @@ public class WorkloadController {
     public ResponseDto<?> getDeployments(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getDeploymentList(userId, clusterId));
+        return ResponseDto.ok(podService.getDeploymentList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/deployments/{deployment_name}")
@@ -113,10 +117,12 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
         return ResponseDto.ok(
-            podService.getDeploymentListByNamespace(userId, namespace, clusterId));
+            podService.getDeploymentListByNamespace(userId, namespace, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/daemons")
@@ -124,9 +130,11 @@ public class WorkloadController {
     public ResponseDto<?> getDaemonSets(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getDaemonSetList(userId, clusterId));
+        return ResponseDto.ok(podService.getDaemonSetList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/daemons/namespace")
@@ -137,9 +145,12 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getDaemonSetListByNamespace(userId, namespace, clusterId));
+        return ResponseDto.ok(
+            podService.getDaemonSetListByNamespace(userId, namespace, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/daemons/{daemon_set_name}")
@@ -160,9 +171,11 @@ public class WorkloadController {
     public ResponseDto<?> getReplicaSets(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getReplicaSetList(userId, clusterId));
+        return ResponseDto.ok(podService.getReplicaSetList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/replicas/namespace")
@@ -173,10 +186,12 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
         return ResponseDto.ok(
-            podService.getReplicaSetListByNamespace(userId, namespace, clusterId));
+            podService.getReplicaSetListByNamespace(userId, namespace, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/replicas/{replica_set_name}")
@@ -197,9 +212,11 @@ public class WorkloadController {
     public ResponseDto<?> getStatefulSets(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getStatefulSetList(userId, clusterId));
+        return ResponseDto.ok(podService.getStatefulSetList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/statefuls/namespace")
@@ -210,10 +227,12 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
         return ResponseDto.ok(
-            podService.getStatefulSetListByNamespace(userId, namespace, clusterId));
+            podService.getStatefulSetListByNamespace(userId, namespace, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/statefuls/{stateful_set_name}")
@@ -234,9 +253,11 @@ public class WorkloadController {
     public ResponseDto<?> getCronJobs(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getCronJobList(userId, clusterId));
+        return ResponseDto.ok(podService.getCronJobList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/cron-jobs/namespace")
@@ -247,9 +268,12 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getCronJobListByNamespace(userId, namespace, clusterId));
+        return ResponseDto.ok(
+            podService.getCronJobListByNamespace(userId, namespace, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/jobs")
@@ -257,9 +281,11 @@ public class WorkloadController {
     public ResponseDto<?> getJobs(
         @UserId Long userId,
         @PathVariable(name = "cluster_id")
-        Long clusterId
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
     ) {
-        return ResponseDto.ok(podService.getJobList(userId, clusterId));
+        return ResponseDto.ok(podService.getJobList(userId, clusterId, continueToken));
     }
 
     @GetMapping("/{cluster_id}/workload/jobs/namespace")
@@ -270,8 +296,22 @@ public class WorkloadController {
         @NotBlank(message = "namespace은 공백이 될 수 없습니다.")
         String namespace,
         @PathVariable(name = "cluster_id")
+        Long clusterId,
+        @RequestParam(name = "continue_token", required = false)
+        String continueToken
+    ) {
+        return ResponseDto.ok(
+            podService.getJobListByNamespace(userId, namespace, clusterId, continueToken));
+    }
+
+    @GetMapping("/{cluster_id}/workload/controller/{pod_name}")
+    @Operation(summary = "Pod 사용량 조회", description = "특정 Pod 사용량 조회")
+    public ResponseDto<?> getPodUsage(
+        @UserId Long userId,
+        @PathVariable(name = "pod_name") String name,
+        @PathVariable(name = "cluster_id")
         Long clusterId
     ) {
-        return ResponseDto.ok(podService.getJobListByNamespace(userId, namespace, clusterId));
+        return ResponseDto.ok(podService.getControllerPodMetrics(userId, name, clusterId));
     }
 }

@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1PodList;
 import io.kubernetes.client.util.Config;
 import java.text.DecimalFormat;
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
@@ -85,6 +86,17 @@ public class MonitoringUtil {
         return decimalFormat.format(bytes / Math.pow(1024, digitGroups)) + " " + units[digitGroups];
     }
 
+    public static String getDuration(Duration duration) {
+        long seconds = duration.getSeconds();
+        if (seconds < 60) {
+            return seconds + "s";
+        } else if (seconds < 3600) {
+            return seconds / 60 + "m";
+        } else {
+            return seconds / 3600 + "h";
+        }
+    }
+
     public ApiClient getV1Api(Long userId, Long clusterId) {
         Cluster clusters = clusterRepository.findById(clusterId)
             .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
@@ -100,7 +112,7 @@ public class MonitoringUtil {
 
     //매분마다
     @Scheduled(cron = "0 * * * * *")
-    public void saveResourceUsage() throws ApiException, KubectlException {
+    public void saveResourceUsage() {
         List<User> users = userRepository.findAll();
         int h = LocalDateTime.now().getHour();
         int m = LocalDateTime.now().getMinute();
@@ -114,12 +126,23 @@ public class MonitoringUtil {
                 long totalMemoryUsage = 0;
                 ApiClient client = getV1Api(user.getId(), cluster.getId());
                 CoreV1Api coreV1Api = new CoreV1Api();
-                V1PodList podList = coreV1Api.listPodForAllNamespaces().execute();
+                V1PodList podList;
+                try {
+                    podList = coreV1Api.listPodForAllNamespaces().execute();
+                } catch (ApiException e) {
+                    log.info("cluster inaccessible");
+                    continue;
+                }
                 for (V1Pod pod : podList.getItems()) {
                     String name = pod.getMetadata().getName();
                     String namespace = pod.getMetadata().getNamespace();
-                    PodMetrics usage = top(V1Pod.class, PodMetrics.class).apiClient(client)
-                        .name(name).namespace(namespace).execute().get(0).getRight();
+                    PodMetrics usage = null;
+                    try {
+                        usage = top(V1Pod.class, PodMetrics.class).apiClient(client)
+                            .name(name).namespace(namespace).execute().get(0).getRight();
+                    } catch (KubectlException e) {
+                        log.info("Metrics not found pod");
+                    }
                     if (usage == null) {
                         continue;
                     }

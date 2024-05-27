@@ -40,6 +40,22 @@ public class NetworkService {
         }
     }
 
+    public List<ServiceListDto> getServiceNameList(Long userId, Long clusterId, String namespace) {
+        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
+        CoreV1Api coreV1Api = new CoreV1Api(client);
+        try {
+            List<V1Service> serviceList = coreV1Api.listNamespacedService(namespace).execute().getItems();
+            List<ServiceListDto> serviceListDtos = new ArrayList<>();
+            for (V1Service service : serviceList) {
+                serviceListDtos.add(ServiceListDto.fromEntity(service));
+            }
+            return serviceListDtos;
+        } catch (ApiException e) {
+            log.error("Error listing services: {}", e.getResponseBody(), e);
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+    }
+
 
     public List<ServiceDetailDto> getServiceDetail(Long userId, Long clusterId,
         String serviceName) {
@@ -62,4 +78,5 @@ public class NetworkService {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
+
 }
