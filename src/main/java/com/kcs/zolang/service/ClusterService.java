@@ -245,7 +245,7 @@ public class ClusterService {
             List<V1Node> nodes = nodeList.getItems();
             NodeMetricsList metricsList = metricsApi.getNodeMetrics();
 
-            List<ClusterNodeListDto> nodeListDtos = nodes.stream()
+            return nodes.stream()
                     .map(node -> {
                         NodeMetrics nodeMetrics = metricsList.getItems().stream()
                                 .filter(metric -> metric.getMetadata().getName().equals(node.getMetadata().getName()))
@@ -255,11 +255,11 @@ public class ClusterService {
                         return ClusterNodeListDto.fromEntity(node, usage);
                     })
                     .collect(Collectors.toList());
-            return nodeListDtos;
         } catch (ApiException e) {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
+
 
     //노드 디테일
     public List<ClusterNodeDetailDto> getClusterNodeDetail(Long userId, Long clusterId, String nodeName) throws Exception {

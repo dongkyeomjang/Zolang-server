@@ -1,12 +1,11 @@
 package com.kcs.zolang.dto.response.cluster;
 
 import io.kubernetes.client.openapi.models.V1Node;
-import io.kubernetes.client.openapi.models.V1NodeCondition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
-
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Builder
 @Schema(name = "ClusterNodeListDto", description = "유저 ClusterNodeList 정보 Dto")
@@ -38,7 +37,7 @@ public record ClusterNodeListDto(
 
         //status-condition
         @Schema(description = "type에 따른 노드 conditions", example = "")
-        List<V1NodeCondition> conditions,
+        List<NodeConditionDto> conditions,
 
         //status-usage
         @Schema(description = "node cpu, memory usage", example = "")
@@ -56,7 +55,7 @@ public record ClusterNodeListDto(
                 .capacityCpu(node.getStatus().getCapacity().get("cpu").getNumber().toString())
                 .capacityMemory(node.getStatus().getCapacity().get("memory").getNumber().toString())
                 .capacityPod(node.getStatus().getCapacity().get("pods").getNumber().toString())
-                .conditions(node.getStatus().getConditions())
+                .conditions(node.getStatus().getConditions().stream().map(NodeConditionDto::fromEntity).collect(Collectors.toList()))
                 .usage(usage)
                 .build();
     }
