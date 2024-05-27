@@ -1,7 +1,5 @@
 package com.kcs.zolang.utility;
 
-import static io.kubernetes.client.extended.kubectl.Kubectl.top;
-
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.response.UserUrlTokenDto;
@@ -10,8 +8,8 @@ import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
+import io.kubernetes.client.Metrics;
 import io.kubernetes.client.custom.PodMetrics;
-import io.kubernetes.client.extended.kubectl.exception.KubectlException;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
@@ -126,6 +124,7 @@ public class MonitoringUtil {
                 long totalMemoryUsage = 0;
                 ApiClient client = getV1Api(user.getId(), cluster.getId());
                 CoreV1Api coreV1Api = new CoreV1Api();
+                Metrics metrics = new Metrics(client);
                 V1PodList podList;
                 try {
                     podList = coreV1Api.listPodForAllNamespaces().execute();
@@ -138,10 +137,11 @@ public class MonitoringUtil {
                     String namespace = pod.getMetadata().getNamespace();
                     PodMetrics usage = null;
                     try {
-                        usage = top(V1Pod.class, PodMetrics.class).apiClient(client)
-                            .name(name).namespace(namespace).execute().get(0).getRight();
-                    } catch (KubectlException e) {
+                        usage = metrics.getPodMetrics(pod.getMetadata().getNamespace()).getItems()
+                            .get(0);
+                    } catch (ApiException e) {
                         log.info("Metrics not found pod");
+                        continue;
                     }
                     if (usage == null) {
                         continue;
