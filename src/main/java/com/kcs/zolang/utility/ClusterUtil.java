@@ -181,18 +181,17 @@ public class ClusterUtil {
             Configuration.setDefaultApiClient(client);
             AppsV1Api api = new AppsV1Api();
 
-            V1Deployment deployment = api.readNamespacedDeployment(cicd.getRepositoryName(), "default").execute();
+            // Deployment 삭제
+            api.deleteNamespacedDeployment(cicd.getRepositoryName(), "default");
+            log.info("Deleted existing deployment: {}", cicd.getRepositoryName());
 
-            Map<String, String> annotations = deployment.getSpec().getTemplate().getMetadata().getAnnotations();
-            if (annotations == null) {
-                annotations = new HashMap<>();
-            }
-            annotations.put("kubectl.kubernetes.io/restartedAt", Instant.now().toString());
-            deployment.getSpec().getTemplate().getMetadata().setAnnotations(annotations);
+            // 새로운 Deployment 생성
+            String deploymentYaml = generateDeploymentYaml(cicd);
+            applyYamlToCluster(deploymentYaml);
+            log.info("Applied new deployment: {}", cicd.getRepositoryName());
 
-            api.replaceNamespacedDeployment(cicd.getRepositoryName(), "default", deployment);
-        } catch (IOException | ApiException e) {
-            throw new RuntimeException("Failed to rollout deployment", e);
+        } catch (IOException e) {
+            throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }
     }
 
