@@ -2,24 +2,27 @@ package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.CICD;
+import com.kcs.zolang.exception.CommonException;
+import com.kcs.zolang.exception.ErrorCode;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Deployment;
+import io.kubernetes.client.openapi.models.V1Pod;
+import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.KubeConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
-import java.io.BufferedReader;
-import java.io.IOException;
-import java.io.InputStreamReader;
-import java.io.StringReader;
+import java.io.*;
 import java.time.Instant;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
 @Slf4j
@@ -109,12 +112,12 @@ public class ClusterUtil {
             executeCommand(secretCommand);
 
             // 역할 생성
-            String roleCommand = String.format("kubectl create role %s --namespace default --verb=get,list,watch --resource=pods,services,deployments,configmaps,secrets,networkpolicies", roleName);
+            String roleCommand = String.format("kubectl create clusterrole %s --verb=get,list,watch --resource=pods,services,deployments,configmaps,secrets,networkpolicies --api-groups=\"\" --api-groups=metrics.k8s.io", roleName);
             log.info("Executing command: {}", roleCommand);
             executeCommand(roleCommand);
 
             // 역할 바인딩 생성
-            String roleBindingCommand = String.format("kubectl create rolebinding %s --namespace default --role=%s --serviceaccount=default:%s", roleBindingName, roleName, saName);
+            String roleBindingCommand = String.format("kubectl create clusterrolebinding %s --clusterrole=%s --serviceaccount=default:%s", roleBindingName, roleName, saName);
             log.info("Executing command: {}", roleBindingCommand);
             executeCommand(roleBindingCommand);
         } catch (IOException | InterruptedException e) {
@@ -155,7 +158,7 @@ public class ClusterUtil {
 
             CoreV1Api api = new CoreV1Api();
 
-            applyYamlToCluster(api, generateDeploymentYaml(cicd));
+            applyYamlToCluster(generateDeploymentYaml(cicd));
         } catch (IOException e) {
             throw new RuntimeException("Failed to deploy application", e);
         }
@@ -185,17 +188,40 @@ public class ClusterUtil {
     public void runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
-            executeCommand(String.format("git clone %s", repoUrl));
-            executeCommand("./gradlew build");
+            String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
+
+            if (!isFirstRun) {
+                // 디렉토리가 존재하면 저장소 업데이트
+                executeCommand(String.format("cd %s && git pull", repoDir));
+                log.info("Execute Command: cd {} && git pull", repoDir);
+            } else {
+                // 디렉토리가 없으면 클론
+                executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
+                log.info("Execute Command: git clone {} {}", repoUrl, repoDir);
+            }
+
+            if (!new File(repoDir + "/gradlew").exists() || !new File(repoDir + "/gradle/wrapper/gradle-wrapper.jar").exists()) {
+                log.info("Gradle wrapper 없음. 생성 중");
+                executeCommand("cd " + repoDir + " && gradle wrapper --gradle-version 8.0.2");
+            }
+
+            // Build the project
+            executeCommand("cd " + repoDir + " && ./gradlew build -x test");
 
             String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
                     awsRegion, awsAccountId, awsRegion);
             executeCommand(ecrLoginCommand);
+            log.info("Execute Command: {}", ecrLoginCommand);
+
+            String ecrRepoName = cicd.getRepositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
 
             String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
-                    awsAccountId, awsRegion, ecrRepositoryPrefix, cicd.getRepositoryName());
-            executeCommand(String.format("docker build -t %s .", imageName));
+                    awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
+            createEcrRepositoryIfNotExists(String.format("%s-%s", ecrRepositoryPrefix, ecrRepoName));
+            executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
+            log.info("Execute Command: cd {} && docker build -t {} .", repoDir, imageName);
             executeCommand(String.format("docker push %s", imageName));
+            log.info("Execute Command: docker push {}", imageName);
 
             if (isFirstRun) {
                 deployApplication(cicd, cluster);
@@ -203,7 +229,7 @@ public class ClusterUtil {
                 rolloutDeployment(cicd, cluster);
             }
         } catch (IOException | InterruptedException e) {
-            throw new RuntimeException("Failed to run pipeline", e);
+            throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }
     }
 
@@ -294,11 +320,50 @@ public class ClusterUtil {
         }
         return output.toString().trim();
     }
-    private void applyYamlToCluster(CoreV1Api api, String yaml) {
+    private void applyYamlToCluster(String yaml) {
         try {
-            api.createNamespacedPod("default", io.kubernetes.client.util.Yaml.loadAs(yaml, io.kubernetes.client.openapi.models.V1Pod.class));
+            // YAML 파일을 읽어서 여러 개의 Kubernetes 리소스 객체로 변환
+            List<Object> resources = io.kubernetes.client.util.Yaml.loadAll(yaml);
+
+            // 각 리소스 객체를 적절한 API를 사용하여 Kubernetes 클러스터에 적용
+            for (Object resource : resources) {
+                if (resource instanceof io.kubernetes.client.openapi.models.V1Deployment) {
+                    AppsV1Api appsV1Api = new AppsV1Api();
+                    V1Deployment deployment = (V1Deployment) resource;
+                    appsV1Api.createNamespacedDeployment("default", deployment);
+                } else if (resource instanceof io.kubernetes.client.openapi.models.V1Service) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    V1Service service = (V1Service) resource;
+                    coreV1Api.createNamespacedService("default", service);
+                } else if (resource instanceof io.kubernetes.client.openapi.models.V1Pod) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    V1Pod pod = (V1Pod) resource;
+                    coreV1Api.createNamespacedPod("default", pod);
+                } else if (resource instanceof io.kubernetes.client.openapi.models.V1ConfigMap) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    V1ConfigMap configMap = (V1ConfigMap) resource;
+                    coreV1Api.createNamespacedConfigMap("default", configMap);
+                }
+                // 필요한 경우 다른 리소스 타입에 대한 처리 추가
+                else {
+                    throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
+                }
+            }
         } catch (Exception e) {
             throw new RuntimeException("Failed to apply YAML", e);
+        }
+    }
+
+    private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException {
+        String checkRepoExistsCommand = String.format("aws ecr describe-repositories --repository-names %s --region %s", repoName, awsRegion);
+        log.info("Executing command: {}", checkRepoExistsCommand);
+        String createRepoCommand = String.format("aws ecr create-repository --repository-name %s --region %s", repoName, awsRegion);
+        log.info("Executing command: {}", createRepoCommand);
+
+        Process process = Runtime.getRuntime().exec(checkRepoExistsCommand);
+        process.waitFor();
+        if (process.exitValue() != 0) {
+            executeCommand(createRepoCommand);
         }
     }
 }
