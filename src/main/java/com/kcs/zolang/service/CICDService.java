@@ -88,12 +88,16 @@ public class CICDService {
     }
     @Transactional
     public void handleGithubWebhook(Map<String, Object> payload) {
-        String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
-        Long userId = cicdRepository.findByRepositoryName(repoName).get().getUser().getId(); // !!!!동일 리포지토리를 여러명이 등록한 경우 고려 아직 x
-        Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        CICD cicd = cicdRepository.findByRepositoryName(repoName)
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
-        clusterUtil.runPipeline(cicd,clusterProvidedByZolang, false);
+        try {
+            String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
+            CICD cicd = cicdRepository.findByRepositoryName(repoName)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+            Long userId = cicd.getUser().getId();
+            Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, false);
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
+        }
     }
 }
