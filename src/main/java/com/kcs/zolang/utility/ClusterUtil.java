@@ -111,8 +111,20 @@ public class ClusterUtil {
             log.info("Executing command: {}", secretCommand);
             executeCommand(secretCommand);
 
-            // 역할 생성
-            String roleCommand = String.format("kubectl create clusterrole %s --verb=get,list,watch --resource=pods,services,deployments,configmaps,secrets,networkpolicies --api-groups=\"\" --api-groups=metrics.k8s.io", roleName);
+            // 역할 생성 (YAML 사용)
+            String roleCommand = String.format("kubectl apply -f - <<EOF\n" +
+                    "apiVersion: rbac.authorization.k8s.io/v1\n" +
+                    "kind: ClusterRole\n" +
+                    "metadata:\n" +
+                    "  name: %s\n" +
+                    "rules:\n" +
+                    "- apiGroups: [\"\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\"]\n" +
+                    "- apiGroups: [\"metrics.k8s.io\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\"]\n" +
+                    "EOF", roleName);
             log.info("Executing command: {}", roleCommand);
             executeCommand(roleCommand);
 
@@ -364,6 +376,25 @@ public class ClusterUtil {
         process.waitFor();
         if (process.exitValue() != 0) {
             executeCommand(createRepoCommand);
+        }
+    }
+
+    public void installAndConfigureMetricsServer() {
+        try {
+            String applyCommand = "kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml";
+            log.info("Executing command: {}", applyCommand);
+            executeCommand(applyCommand);
+
+            String patchCommand = "kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{" +
+                    "\"op\": \"add\", \"path\": \"/spec/template/spec/containers/0/args/-\", \"value\": \"--kubelet-insecure-tls\"}," +
+                    "{\"op\": \"add\", \"path\": \"/spec/template/spec/hostNetwork\", \"value\": true}]'";
+            log.info("Executing command: {}", patchCommand);
+            executeCommand(patchCommand);
+
+            log.info("Metrics Server installed and configured successfully");
+        } catch (IOException | InterruptedException e) {
+            log.error("Exception occurred while installing and configuring metrics-server", e);
+            throw new RuntimeException("Failed to install and configure metrics-server", e);
         }
     }
 }

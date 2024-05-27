@@ -128,6 +128,8 @@ public class ClusterService {
         cluster.update(clusterName, secretToken, domainUrl, version);
         clusterRepository.save(cluster);
 
+        clusterUtil.installAndConfigureMetricsServer();
+
         return ClusterCreateResponseDto.fromEntity(cluster);
     }
 
