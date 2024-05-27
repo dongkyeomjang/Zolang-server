@@ -143,6 +143,9 @@ public class MonitoringUtil {
                         log.info("Metrics not found pod");
                         continue;
                     }
+                    if (usage == null) {
+                        continue;
+                    }
                     UsageDto podUsage = UsageDto.fromEntity(usage, time);
                     totalCpuUsage += podUsage.cpuUsage();
                     totalMemoryUsage += podUsage.memoryUsage();
