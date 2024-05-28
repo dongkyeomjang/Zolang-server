@@ -1,10 +1,23 @@
 package com.kcs.zolang.dto.response;
 
+import com.kcs.zolang.domain.Build;
+import lombok.Builder;
+
+import java.time.LocalDateTime;
+
+@Builder
 public record BuildDto(
-        String repositoryName,
-        Long buildNumber,
+        Integer buildNumber,
         String lastCommitMessage,
         String buildStatus,
-        String createdAt
+        LocalDateTime createdAt
 ) {
+    public static BuildDto fromEntity(Build build){
+        return BuildDto.builder()
+                .buildNumber(build.getBuildNumber())
+                .lastCommitMessage(build.getLastCommitMessage())
+                .buildStatus(build.getBuildStatus())
+                .createdAt(build.getCreatedAt())
+                .build();
+    }
 }

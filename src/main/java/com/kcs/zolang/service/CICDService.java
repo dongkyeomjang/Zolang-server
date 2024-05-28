@@ -135,4 +135,10 @@ public class CICDService {
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
     }
+    public List<BuildDto> getBuildRecords(Long cicdId) {
+        CICD cicd = cicdRepository.findById(cicdId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+        List<Build> buildList = buildRepository.findByCICD(cicd);
+        return buildList.stream().map(BuildDto::fromEntity).toList();
+    }
 }

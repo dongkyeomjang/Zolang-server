@@ -5,10 +5,7 @@ import com.kcs.zolang.dto.global.ResponseDto;
 import com.kcs.zolang.dto.request.GitRepoRequestDto;
 import com.kcs.zolang.service.CICDService;
 import lombok.RequiredArgsConstructor;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequiredArgsConstructor
@@ -21,4 +18,9 @@ public class CICDController {
         cicdService.registerRepository(userId, requestDto);
         return ResponseDto.created(null);
     }
+    @GetMapping("{repository_id}")
+    public ResponseDto<?> getBuildRecords(@PathVariable Long repositoryId) {
+        return ResponseDto.ok(cicdService.getBuildRecords(repositoryId));
+    }
+
 }
