@@ -136,7 +136,7 @@ public class MonitoringUtil {
                 for (V1Pod pod : podList.getItems()) {
                     String name = pod.getMetadata().getName();
                     String namespace = pod.getMetadata().getNamespace();
-                    PodMetrics usage = null;
+                    PodMetrics usage;
                     try {
                         usage = metrics.getPodMetrics(pod.getMetadata().getNamespace()).getItems()
                             .get(0);

@@ -79,7 +79,7 @@ public class WorkloadService {
             return getCountWorkloadOverview(deployment, daemonSet, replicaSet, statefulSet,
                 cronJobList, jobList, podList);
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -105,7 +105,7 @@ public class WorkloadService {
             return getCountWorkloadOverview(deployment, daemonSet, replicaSet, statefulSet,
                 cronJobList, jobList, podList);
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -135,10 +135,7 @@ public class WorkloadService {
             return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
                 podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
-            if (e.getCode() == 400) {
-                throw new CommonException(ErrorCode.INVALID_PARAMETER_FORMAT);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -169,7 +166,7 @@ public class WorkloadService {
             return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
                 podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
-            throw new RuntimeException(e);
+            throw getApiError(e);
         }
     }
 
@@ -198,10 +195,7 @@ public class WorkloadService {
             }
             return PodDetailDto.fromEntity(pod, controlledDto, pvcDtoList, podUsage, volumes);
         } catch (ApiException e) {
-            if (e.getCode() == 404) {
-                throw new CommonException(ErrorCode.NOT_FOUND_POD);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -225,7 +219,7 @@ public class WorkloadService {
                 deploymentList.getMetadata().getContinue(), startIndex, names.size());
 
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -237,10 +231,7 @@ public class WorkloadService {
             V1Deployment deployment = appsV1Api.readNamespacedDeployment(name, namespace).execute();
             return DeploymentDetailDto.fromEntity(deployment);
         } catch (ApiException e) {
-            if (e.getCode() == 404) {
-                throw new CommonException(ErrorCode.NOT_FOUND_DEPLOYMENT);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -264,7 +255,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 deploymentList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -288,7 +279,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 daemonSetList.getMetadata().getContinue(), startIndex, commonControllers.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -311,7 +302,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 daemonSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -331,10 +322,7 @@ public class WorkloadService {
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(daemonSet, podList, serviceList);
         } catch (ApiException e) {
-            if (e.getCode() == 404) {
-                throw new CommonException(ErrorCode.NOT_FOUND_DEMON_SET);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -356,7 +344,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -379,7 +367,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -399,10 +387,7 @@ public class WorkloadService {
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(replicaSet, podList, serviceList);
         } catch (ApiException e) {
-            if (e.getCode() == 404) {
-                throw new CommonException(ErrorCode.NOT_FOUND_REPLICA_SET);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -424,7 +409,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -446,7 +431,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -462,10 +447,7 @@ public class WorkloadService {
                 statefulSet.getKind());
             return CommonControllerDetailDto.fromEntity(statefulSet, pods);
         } catch (ApiException e) {
-            if (e.getCode() == 404) {
-                throw new CommonException(ErrorCode.NOT_FOUND_STATEFUL_SET);
-            }
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -487,7 +469,7 @@ public class WorkloadService {
             return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -509,7 +491,7 @@ public class WorkloadService {
             return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -530,7 +512,7 @@ public class WorkloadService {
             return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -552,7 +534,7 @@ public class WorkloadService {
             return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -560,8 +542,7 @@ public class WorkloadService {
         monitoringUtil.getV1Api(userId, clusterId);
         int m = getMinute(clusterId);
         String key = "cluster-usage:" + clusterId + ":" + name + ":" + m;
-        UsageDto usageDto = getUsage(List.of(key)).get(0);
-        return PodMetricsDto.fromEntity(usageDto,
+        return PodMetricsDto.fromEntity(getUsage(List.of(key)).get(0),
             getPodMetrics(clusterId, name, m));
     }
 
@@ -590,7 +571,7 @@ public class WorkloadService {
                         batchV1Api.readNamespacedJob(name, namespace).execute());
             }
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
         return null;
     }
@@ -665,7 +646,7 @@ public class WorkloadService {
             return PodPersistentVolumeClaimDto.fromEntity(
                 coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace).execute());
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
     }
 
@@ -714,7 +695,7 @@ public class WorkloadService {
                 }
             }
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
         return getPodSimpleDtoList(clusterId, pods, m);
     }
@@ -737,7 +718,7 @@ public class WorkloadService {
                 }
             }
         } catch (ApiException e) {
-            throw new CommonException(ErrorCode.API_ERROR);
+            throw getApiError(e);
         }
         return services.stream().map(ServiceListDto::fromEntity).toList();
     }
@@ -753,13 +734,29 @@ public class WorkloadService {
         return startCount;
     }
 
+    private CommonException getApiError(ApiException e) {
+        if (e.getCode() == 401) {
+            return new CommonException(ErrorCode.INVALID_TOKEN_ERROR);
+        }
+        if (e.getCode() == 403) {
+            return new CommonException(ErrorCode.ACCESS_DENIED);
+        }
+        if (e.getCode() == 404) {
+            return new CommonException(ErrorCode.NOT_FOUND_RESOURCE);
+        }
+        return new CommonException(ErrorCode.API_ERROR);
+    }
+
     private int getMinute(Long clusterId) {
         int m = LocalDateTime.now().minusSeconds(10).getMinute();
-        for (int i = 0; i < 2; i++) {
+        int end = m - 10;
+        while (m > end) {
             if (getUsage(List.of(
                 "cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m)) % 60))).get(0)
                 == null) {
                 m--;
+            } else {
+                break;
             }
         }
         return m;
