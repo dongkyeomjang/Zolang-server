@@ -17,6 +17,7 @@ import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.KubeConfig;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
@@ -24,7 +25,8 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.TimeUnit;
+import java.util.concurrent.*;
+
 @Slf4j
 @Component
 public class ClusterUtil {
@@ -135,6 +137,8 @@ public class ClusterUtil {
         } catch (IOException | InterruptedException e) {
             log.error("Exception occurred while creating service account and role with kubectl", e);
             throw new RuntimeException("Failed to create service account and role with kubectl", e);
+        } catch (ExecutionException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -162,19 +166,6 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-
-    public void deployApplication(CICD cicd, Cluster cluster) {
-        try {
-            ApiClient client = buildApiClient(generateKubeConfig(cluster));
-            Configuration.setDefaultApiClient(client);
-
-            CoreV1Api api = new CoreV1Api();
-
-            applyYamlToCluster(generateDeploymentYaml(cicd));
-        } catch (IOException e) {
-            throw new RuntimeException("Failed to deploy application", e);
-        }
-    }
     public void rolloutDeployment(CICD cicd, Cluster cluster) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
@@ -187,7 +178,7 @@ public class ClusterUtil {
 
             // 새로운 Deployment 생성
             String deploymentYaml = generateDeploymentYaml(cicd);
-            applyYamlToCluster(deploymentYaml);
+            applyYamlToCluster(deploymentYaml, cluster);
             log.info("Applied new deployment: {}", cicd.getRepositoryName());
 
         } catch (IOException e) {
@@ -202,13 +193,9 @@ public class ClusterUtil {
             String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
 
             if (!isFirstRun) {
-                // 디렉토리가 존재하면 저장소 업데이트
                 executeCommand(String.format("cd %s && git pull", repoDir));
-                log.info("Execute Command: cd {} && git pull", repoDir);
             } else {
-                // 디렉토리가 없으면 클론
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
-                log.info("Execute Command: git clone {} {}", repoUrl, repoDir);
             }
 
             if (!new File(repoDir + "/gradlew").exists() || !new File(repoDir + "/gradle/wrapper/gradle-wrapper.jar").exists()) {
@@ -216,13 +203,11 @@ public class ClusterUtil {
                 executeCommand("cd " + repoDir + " && gradle wrapper --gradle-version 8.0.2");
             }
 
-            // Build the project
             executeCommand("cd " + repoDir + " && ./gradlew build -x test");
 
             String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
                     awsRegion, awsAccountId, awsRegion);
             executeCommand(ecrLoginCommand);
-            log.info("Execute Command: {}", ecrLoginCommand);
 
             String ecrRepoName = cicd.getRepositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
 
@@ -230,16 +215,14 @@ public class ClusterUtil {
                     awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
             createEcrRepositoryIfNotExists(String.format("%s-%s", ecrRepositoryPrefix, ecrRepoName));
             executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
-            log.info("Execute Command: cd {} && docker build -t {} .", repoDir, imageName);
             executeCommand(String.format("docker push %s", imageName));
-            log.info("Execute Command: docker push {}", imageName);
 
             if (isFirstRun) {
-                deployApplication(cicd, cluster);
+                applyYamlToCluster(generateDeploymentYaml(cicd), cluster);
             } else {
                 rolloutDeployment(cicd, cluster);
             }
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException | InterruptedException | ExecutionException e) {
             throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }
     }
@@ -300,18 +283,52 @@ public class ClusterUtil {
                 cluster.getSecretToken()
         );
     }
-    private void executeCommand(String command) throws IOException, InterruptedException {
+    private void executeCommand(String command) throws IOException, InterruptedException, ExecutionException {
+        log.info("Executing command: {}", command);
         ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
+        processBuilder.redirectErrorStream(true); // stderr와 stdout을 같이 출력
         Process process = processBuilder.start();
-        try (BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()))) {
-            String line;
-            while ((line = reader.readLine()) != null) {
-                log.info(line);
-            }
+
+        // 별도의 쓰레드로 출력 읽기
+        StreamGobbler outputGobbler = new StreamGobbler(process.getInputStream(), log);
+        ExecutorService executorService = Executors.newSingleThreadExecutor();
+        Future<?> future = executorService.submit(outputGobbler);
+
+        boolean finished = process.waitFor(60, TimeUnit.MINUTES); // 빌드 시간을 충분히 길게 설정
+        if (!finished) {
+            process.destroy();
+            executorService.shutdownNow();
+            throw new RuntimeException("Command timed out: " + command);
         }
-        int exitCode = process.waitFor();
+
+        future.get(); // 출력 쓰레드 완료 대기
+        executorService.shutdown();
+
+        int exitCode = process.exitValue();
         if (exitCode != 0) {
-            throw new RuntimeException("Command failed: " + command);
+            throw new RuntimeException("Command failed with exit code " + exitCode + ": " + command);
+        }
+    }
+
+    private static class StreamGobbler implements Runnable {
+        private InputStream inputStream;
+        private org.slf4j.Logger log;
+
+        public StreamGobbler(InputStream inputStream, org.slf4j.Logger log) {
+            this.inputStream = inputStream;
+            this.log = log;
+        }
+
+        @Override
+        public void run() {
+            try (BufferedReader reader = new BufferedReader(new InputStreamReader(inputStream))) {
+                String line;
+                while ((line = reader.readLine()) != null) {
+                    log.info("stdout: {}", line);
+                }
+            } catch (IOException e) {
+                log.error("Error reading process output", e);
+            }
         }
     }
 
@@ -331,10 +348,12 @@ public class ClusterUtil {
         }
         return output.toString().trim();
     }
-    private void applyYamlToCluster(String yaml) {
+    private void applyYamlToCluster(String yaml, Cluster cluster) {
         try {
             // YAML 파일을 읽어서 여러 개의 Kubernetes 리소스 객체로 변환
             List<Object> resources = io.kubernetes.client.util.Yaml.loadAll(yaml);
+            ApiClient client = buildApiClient(generateKubeConfig(cluster));
+            Configuration.setDefaultApiClient(client);
 
             // 각 리소스 객체를 적절한 API를 사용하여 Kubernetes 클러스터에 적용
             for (Object resource : resources) {
@@ -365,7 +384,7 @@ public class ClusterUtil {
         }
     }
 
-    private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException {
+    private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException, ExecutionException {
         String checkRepoExistsCommand = String.format("aws ecr describe-repositories --repository-names %s --region %s", repoName, awsRegion);
         log.info("Executing command: {}", checkRepoExistsCommand);
         String createRepoCommand = String.format("aws ecr create-repository --repository-name %s --region %s", repoName, awsRegion);
@@ -391,7 +410,7 @@ public class ClusterUtil {
             executeCommand(patchCommand);
 
             log.info("Metrics Server installed and configured successfully");
-        } catch (IOException | InterruptedException e) {
+        } catch (IOException | InterruptedException | ExecutionException e) {
             log.error("Exception occurred while installing and configuring metrics-server", e);
             throw new RuntimeException("Failed to install and configure metrics-server", e);
         }
