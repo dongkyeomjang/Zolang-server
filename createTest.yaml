@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: test
+  labels:
+    z: zz
+spec:
+  storageClassName: d
+  capacity:
+    storage: d
+  accessModes:
+    - ReadWriteOnce
+  hostPath:
+    path: dd
