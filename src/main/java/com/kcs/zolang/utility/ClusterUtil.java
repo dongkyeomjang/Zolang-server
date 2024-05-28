@@ -5,7 +5,6 @@ import com.kcs.zolang.domain.CICD;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import io.kubernetes.client.openapi.ApiClient;
-import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
@@ -30,7 +29,6 @@ import java.util.concurrent.*;
 @Slf4j
 @Component
 public class ClusterUtil {
-
     @Value("${aws.account.id}")
     private String awsAccountId;
     @Value("${aws.region}")
@@ -186,8 +184,8 @@ public class ClusterUtil {
         }
     }
 
-
-    public void runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
+    @Async
+    public CompletableFuture<Void> runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
             String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
@@ -222,6 +220,7 @@ public class ClusterUtil {
             } else {
                 rolloutDeployment(cicd, cluster);
             }
+            return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
             throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }

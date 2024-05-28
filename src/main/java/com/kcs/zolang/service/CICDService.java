@@ -1,11 +1,14 @@
 package com.kcs.zolang.service;
 
+import com.kcs.zolang.domain.Build;
 import com.kcs.zolang.domain.CICD;
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.request.GitRepoRequestDto;
+import com.kcs.zolang.dto.response.BuildDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
+import com.kcs.zolang.repository.BuildRepository;
 import com.kcs.zolang.repository.CICDRepository;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UserRepository;
@@ -24,12 +27,14 @@ import org.springframework.web.client.RestTemplate;
 
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CICDService {
     private final CICDRepository cicdRepository;
+    private final BuildRepository buildRepository;
     private final UserRepository userRepository;
     private final ClusterRepository clusterRepository;
     private final RestTemplate restTemplate;
@@ -39,7 +44,6 @@ public class CICDService {
     @Value("${github.webhook-url}")
     private String webhookUrl;
 
-    @Transactional
     public void registerRepository(Long userId, GitRepoRequestDto requestDto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
@@ -80,13 +84,29 @@ public class CICDService {
                     .repositoryName(requestDto.repoName())
                     .build();
             cicdRepository.save(cicd);
-            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, true);
 
+            Build build = Build.builder()
+                            .CICD(cicd)
+                            .buildStatus("building")
+                            .lastCommitMessage("init")
+                            .buildNumber(1)
+                            .build();
+            buildRepository.save(build);
+
+            try {
+                clusterUtil.runPipeline(cicd, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
+                build.update("success");
+                buildRepository.save(build);
+            } catch (Exception e) {
+                build.update("failed");
+                buildRepository.save(build);
+                throw new CommonException(ErrorCode.PIPELINE_ERROR);
+            }
         } catch (HttpClientErrorException e) {
             throw new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK);
         }
     }
-    @Transactional
+
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
             String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
@@ -95,7 +115,22 @@ public class CICDService {
             Long userId = cicd.getUser().getId();
             Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-            clusterUtil.runPipeline(cicd, clusterProvidedByZolang, false);
+            Build build = Build.builder()
+                    .CICD(cicd)
+                    .lastCommitMessage((String) ((Map<String, Object>) payload.get("head_commit")).get("message"))
+                    .buildNumber(buildRepository.findBuildNumberByCICD(cicd).orElse(0) + 1)
+                    .buildStatus("building")
+                    .build();
+            buildRepository.save(build);
+            try {
+                clusterUtil.runPipeline(cicd, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
+                build.update("success");
+                buildRepository.save(build);
+            } catch (Exception e) {
+                build.update("failed");
+                buildRepository.save(build);
+                throw new CommonException(ErrorCode.PIPELINE_ERROR);
+            }
         } catch (Exception e) {
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
