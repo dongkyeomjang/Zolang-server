@@ -18,6 +18,10 @@ public class CICDController {
         cicdService.registerRepository(userId, requestDto);
         return ResponseDto.created(null);
     }
+    @GetMapping("")
+    public ResponseDto<?> getCICDs(@UserId Long userId){
+        return ResponseDto.ok(cicdService.getCICDs(userId));
+    }
     @GetMapping("{repository_id}")
     public ResponseDto<?> getBuildRecords(@PathVariable Long repositoryId) {
         return ResponseDto.ok(cicdService.getBuildRecords(repositoryId));

@@ -10,4 +10,5 @@ import java.util.Optional;
 public interface BuildRepository extends JpaRepository<Build, Long> {
     Optional<Integer> findBuildNumberByCICD(CICD cicd);
     List<Build> findByCICD(CICD cicd);
+    Optional<Build> findTopByCICDOrderByCreatedAtDesc(CICD cicd);
 }

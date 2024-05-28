@@ -6,6 +6,7 @@ import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.request.GitRepoRequestDto;
 import com.kcs.zolang.dto.response.BuildDto;
+import com.kcs.zolang.dto.response.CICDDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.BuildRepository;
@@ -134,6 +135,14 @@ public class CICDService {
         } catch (Exception e) {
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
+    }
+    public List<CICDDto> getCICDs(Long userId) {
+        List<CICD> cicdList = cicdRepository.findByUserId(userId);
+        return cicdList.stream().map(cicd -> {
+            Build lastBuild = buildRepository.findTopByCICDOrderByCreatedAtDesc(cicd)
+                    .orElse(Build.builder().build());
+            return CICDDto.fromEntity(cicd, lastBuild);
+        }).toList();
     }
     public List<BuildDto> getBuildRecords(Long cicdId) {
         CICD cicd = cicdRepository.findById(cicdId)
