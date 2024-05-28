@@ -108,8 +108,8 @@ public class MonitoringUtil {
         return client;
     }
 
-    //매분마다
-    @Scheduled(cron = "0 * * * * *")
+    //2분마다
+    @Scheduled(cron = "0 */2 * * * *")
     public void saveResourceUsage() {
         List<User> users = userRepository.findAll();
         int h = LocalDateTime.now().getHour();
