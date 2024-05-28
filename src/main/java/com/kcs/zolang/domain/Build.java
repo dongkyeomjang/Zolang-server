@@ -20,7 +20,7 @@ public class Build {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repository_id", nullable = false)
+    @JoinColumn(name = "repository_id", foreignKey = @ForeignKey(name = "FK_BUILD_REPOSITORY"))
     private CICD CICD;
 
     @Column(name = "last_commit_message", nullable = false)
