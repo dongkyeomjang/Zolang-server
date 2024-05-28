@@ -23,8 +23,8 @@ public class CICDController {
         return ResponseDto.ok(cicdService.getCICDs(userId));
     }
     @GetMapping("{repository_id}")
-    public ResponseDto<?> getBuildRecords(@PathVariable Long repositoryId) {
-        return ResponseDto.ok(cicdService.getBuildRecords(repositoryId));
+    public ResponseDto<?> getBuildRecords(@PathVariable Long repository_id) {
+        return ResponseDto.ok(cicdService.getBuildRecords(repository_id));
     }
 
 }
