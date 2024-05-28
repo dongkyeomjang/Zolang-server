@@ -38,18 +38,23 @@ public class Cluster {
     @Column(name = "version", nullable = false)
     private String version;
 
+    @Column(name = "status")
+    private String status;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
+
     @Builder
-    public Cluster(User user, String clusterName, String provider, String secretToken, String domainUrl, String version, String certPath) {
+    public Cluster(User user, String clusterName, String provider, String secretToken, String domainUrl, String version, String status) {
         this.user = user;
         this.clusterName = clusterName;
         this.provider = provider;
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
         this.version = version;
+        this.status = status;
         this.createdAt = LocalDateTime.now();
     }
     public void update(String clusterName, String secretToken, String domainUrl, String version) {
@@ -57,5 +62,8 @@ public class Cluster {
         this.secretToken = secretToken;
         this.domainUrl = domainUrl;
         this.version = version;
+    }
+    public void updateStatus(String status) {
+        this.status = status;
     }
 }
