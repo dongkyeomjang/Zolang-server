@@ -1,5 +1,6 @@
 package com.kcs.zolang.service;
 
+import com.google.protobuf.Api;
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.request.ClusterVersionRequestDto;
@@ -240,40 +241,42 @@ public class ClusterService {
 
 
     public List<ClusterListDto> getClusters(Long userId) {
-        return clusterRepository.findByUserId(userId).stream() // 사용자가 웹서비스에 등록해놓은 클러스터 리스트 가져와서
-                .map(ClusterListDto::fromEntity) // ClusterListDto로 변환하고
-                .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
-    }
-
-    //현재 클러스터 상태
-    public Boolean getClusterStatus(Long userId, Long clusterId) throws Exception {
-
-        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
-        CoreV1Api coreV1Api = new CoreV1Api(client);
-
-        try {
-            V1NodeList nodeList = coreV1Api.listNode().execute();
-            List<V1Node> nodes = nodeList.getItems();
-
-            for (V1Node node : nodes) {
-                List<V1NodeCondition> conditions = node.getStatus().getConditions();
-                //추후 for문 수정 예정
-                for (V1NodeCondition condition : conditions) {
-                    if ("Ready".equals(condition.getType())) {
-                        if (!"True".equals(condition.getStatus())) {
-                            return false;
+        return clusterRepository.findByUserId(userId).stream()
+                .peek(cluster -> {
+                    if (!"creating".equals(cluster.getStatus())) {
+                        CoreV1Api coreV1Api = new CoreV1Api(monitoringUtil.getV1Api(userId, cluster.getId()));
+                        boolean hasError = false;
+                        try {
+                            List<V1Node> nodes = coreV1Api.listNode().execute().getItems();
+                            for (V1Node node : nodes) {
+                                V1NodeStatus status = node.getStatus();
+                                if (status == null) {
+                                    hasError = true;
+                                    break;
+                                }
+                                List<V1NodeCondition> conditions = status.getConditions();
+                                if (conditions == null) {
+                                    hasError = true;
+                                    break;
+                                }
+                                for (V1NodeCondition condition : conditions) {
+                                    if ("Ready".equals(condition.getType()) && !"True".equals(condition.getStatus())) {
+                                        hasError = true;
+                                        break;
+                                    }
+                                }
+                                if (hasError) break;
+                            }
+                        } catch (ApiException e) {
+                            hasError = true;
                         }
-                    }
-                }
-            }
-            return true;
-        } catch (ApiException e) {
-            log.error("Error listing services: {}", e.getResponseBody(), e);
-            //오류 코드 수정 예정
-            throw new CommonException(ErrorCode.API_ERROR);
-        }
+                        cluster.updateStatus(hasError ? "error" : "ready");
+                        clusterRepository.save(cluster);
+                    } // creating(생성중) 상태 클러스터는 상태 업데함트 안함
+                })
+                .map(ClusterListDto::fromEntity)
+                .toList();
     }
-
     //노드 사용량
     private NodeUsageDto getNodeUsage(NodeMetrics nodeMetrics) {
         return NodeUsageDto.fromEntity(nodeMetrics, LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
