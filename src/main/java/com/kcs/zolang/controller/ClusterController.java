@@ -88,4 +88,14 @@ public class ClusterController {
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodeSimpleStatus(userId, clusterId, nodeName));
     }
+
+    @DeleteMapping("/{cluster_id}")
+    @Operation(summary = "클러스터 삭제", description = "등록된 클러스터 삭제")
+    public ResponseDto<?> deleteCluster(
+            @UserId Long userId,
+            @PathVariable("cluster_id") Long clusterId
+    ) throws Exception {
+        clusterService.deleteCluster(userId, clusterId);
+        return ResponseDto.ok(null);
+    }
 }

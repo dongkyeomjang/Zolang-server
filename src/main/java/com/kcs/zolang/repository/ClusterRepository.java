@@ -11,5 +11,6 @@ import org.springframework.stereotype.Repository;
 public interface ClusterRepository extends JpaRepository<Cluster, Long> {
 
     List<Cluster> findByUserId(Long userId);
+    Optional<Cluster> findByIdAndUserId(Long clusterId, Long userId);
     Optional<Cluster> findByProviderAndUserId(String provider, Long userId);
 }

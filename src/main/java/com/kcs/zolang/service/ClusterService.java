@@ -446,7 +446,9 @@ public class ClusterService {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
-
-
-
+    public void deleteCluster(Long userId, Long clusterId) {
+        Cluster cluster = clusterRepository.findByIdAndUserId(clusterId, userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+        clusterRepository.delete(cluster);
+    }
 }
