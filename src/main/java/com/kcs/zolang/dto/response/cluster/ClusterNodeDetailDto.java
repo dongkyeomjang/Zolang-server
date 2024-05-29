@@ -33,7 +33,7 @@ public record ClusterNodeDetailDto(
         @Schema(description = "특정 노드 이름", example = "ip-172-31-11-72.ap-northeast-2.compute.internal")
         String name,
         @Schema(description = "특정 노드의 conditions 데이터", example = "")
-        List<V1NodeCondition> conditions,
+        List<NodeConditionDto> conditions,
         @Schema(description = "특정 노드의 capacity 데이터", example = "")
         Map<String, String> capacity
 ) {
@@ -50,7 +50,7 @@ public record ClusterNodeDetailDto(
                 .created(node.getMetadata().getCreationTimestamp().toString())
                 .kernelVersion(node.getStatus().getNodeInfo().getKernelVersion())
                 .name(node.getMetadata().getName())
-                .conditions(node.getStatus().getConditions())
+                .conditions(node.getStatus().getConditions().stream().map(NodeConditionDto::fromEntity).collect(Collectors.toList()))
                 .capacity(node.getStatus().getCapacity().entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getNumber().toString())))
                 .build();
