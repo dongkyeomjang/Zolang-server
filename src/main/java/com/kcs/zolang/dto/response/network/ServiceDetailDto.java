@@ -42,9 +42,12 @@ public record ServiceDetailDto(
                 service.getSpec().getIpFamilyPolicy()
         );
 
-        List<String> loadBalancerIngress = service.getStatus().getLoadBalancer().getIngress().stream()
+        //ingress null처리
+        List<String> loadBalancerIngress = service.getStatus().getLoadBalancer() != null && service.getStatus().getLoadBalancer().getIngress() != null
+                ? service.getStatus().getLoadBalancer().getIngress().stream()
                 .map(V1LoadBalancerIngress::getHostname)
-                .collect(Collectors.toList());
+                .collect(Collectors.toList())
+                : null;
 
         Status status = new Status(
                 loadBalancerIngress
