@@ -23,12 +23,21 @@ public record NodeUsageDto(
         Map<String, Quantity> usage = nodeMetrics.getUsage();
         DecimalFormat df = new DecimalFormat("#.###");
         df.setRoundingMode(RoundingMode.UP);
-        double formattedCpuUsage = Double.parseDouble(
-                df.format(usage.get("cpu").getNumber().doubleValue()));
+
+        double formattedCpuUsage = 0.0;
+        if (usage.get("cpu") != null) {
+            formattedCpuUsage = Double.parseDouble(df.format(usage.get("cpu").getNumber().doubleValue()));
+        }
+
+        long memoryUsage = 0;
+        if (usage.get("memory") != null) {
+            memoryUsage = usage.get("memory").getNumber().longValue();
+        }
+
         return NodeUsageDto.builder()
                 .time(time)
                 .nodeCpuUsage(formattedCpuUsage)
-                .nodeMemoryUsage(usage.get("memory").getNumber().longValue())
+                .nodeMemoryUsage(memoryUsage)
                 .build();
     }
 
