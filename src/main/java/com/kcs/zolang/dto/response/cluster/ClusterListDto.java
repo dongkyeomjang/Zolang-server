@@ -10,6 +10,7 @@ public record ClusterListDto(
         String domainUrl,
         String version,
         String status
+        String provider
 ) {
     public static ClusterListDto fromEntity(Cluster cluster) {
         return ClusterListDto.builder()
@@ -18,6 +19,7 @@ public record ClusterListDto(
                 .domainUrl(cluster.getDomainUrl())
                 .status(cluster.getStatus())
                 .version(cluster.getVersion())
+                .provider(cluster.getProvider())
                 .build();
     }
 }

@@ -392,7 +392,7 @@ public class ClusterService {
                 totalPodCapacity += Integer.parseInt(node.getStatus().getCapacity().get("pods").getNumber().toString());
             }
 
-            //실행중인 파드만 사용량으로
+            //실행중인 파드만 사용량으로(running이 아닐 경우 그냥 0으로)
             totalPodUsage = (int) podList.stream()
                     .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
                     .count();
