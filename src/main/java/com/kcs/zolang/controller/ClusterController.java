@@ -20,7 +20,7 @@ import java.io.IOException;
 public class ClusterController {
     private final ClusterService clusterService;
 
-    @GetMapping("/version")
+    @PostMapping("/version")
     @Operation(summary = "클러스터 버전 조회", description = "클러스터 버전을 조회합니다.")
     public ResponseDto<?> getVersion(@RequestBody ClusterVersionRequestDto clusterVersionRequestDto) throws ApiException {
         return ResponseDto.ok(clusterService.getVersion(clusterVersionRequestDto));
@@ -50,16 +50,6 @@ public class ClusterController {
     ) {
         return ResponseDto.ok(clusterService.getClusters(userId));
     }
-
-    @GetMapping("/{cluster_id}/status")
-    @Operation(summary = "클러스터 상태 조회", description = "클러스터의 상태를 조회. 클러스터 목록 조회와 같이 호출되어야함")
-    public ResponseDto<?> getClusterStatus(
-            @UserId Long userId,
-            @PathVariable(name = "cluster_id") Long clusterId
-    ) throws Exception {
-        return ResponseDto.ok(clusterService.getClusterStatus(userId, clusterId));
-    }
-
     @GetMapping("/{cluster_id}/nodes")
     @Operation(summary = "클러스터 노드 목록 조회", description = "등록된 클러스터의 노드 목록을 조회")
     public ResponseDto<?> getClusterNodes(
@@ -97,5 +87,15 @@ public class ClusterController {
             @PathVariable(name = "node_name") String nodeName
     ) throws Exception {
         return ResponseDto.ok(clusterService.getClusterNodeSimpleStatus(userId, clusterId, nodeName));
+    }
+
+    @DeleteMapping("/{cluster_id}")
+    @Operation(summary = "클러스터 삭제", description = "등록된 클러스터 삭제")
+    public ResponseDto<?> deleteCluster(
+            @UserId Long userId,
+            @PathVariable("cluster_id") Long clusterId
+    ) throws Exception {
+        clusterService.deleteCluster(userId, clusterId);
+        return ResponseDto.ok(null);
     }
 }

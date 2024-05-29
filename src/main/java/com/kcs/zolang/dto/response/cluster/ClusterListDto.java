@@ -9,6 +9,7 @@ public record ClusterListDto(
         String clusterName,
         String domainUrl,
         String version,
+        String status
         String provider
 ) {
     public static ClusterListDto fromEntity(Cluster cluster) {
@@ -16,6 +17,7 @@ public record ClusterListDto(
                 .clusterId(cluster.getId())
                 .clusterName(cluster.getClusterName())
                 .domainUrl(cluster.getDomainUrl())
+                .status(cluster.getStatus())
                 .version(cluster.getVersion())
                 .provider(cluster.getProvider())
                 .build();

@@ -12,28 +12,7 @@ spec:
       labels:
         app: zolang
     spec:
-      securityContext:
-        fsGroup: 0
       containers:
-        - name: docker
-          image: docker:24.0.0-rc.1-dind
-          securityContext:
-            privileged: true
-            runAsUser: 0
-            runAsGroup: 0
-          env:
-            - name: DOCKER_TLS_CERTDIR
-              value: ""
-            - name: DOCKER_HOST
-              value: "tcp://0.0.0.0:2376"
-          command: ["dockerd"]
-          args: ["--host=tcp://0.0.0.0:2376", "--host=unix:///var/run/docker.sock"]
-          volumeMounts:
-            - name: dind-storage
-              mountPath: /var/lib/docker
-          ports:
-            - containerPort: 2376
-              hostPort: 2376 
         - name: zolang
           image: 058264295714.dkr.ecr.ap-northeast-2.amazonaws.com/zolang:latest
           imagePullPolicy: Always
@@ -51,23 +30,7 @@ spec:
                   name: aws-secret
                   key: aws_secret_access_key
             - name: DOCKER_HOST
-              value: "tcp://localhost:2376"
+              value: "tcp://docker-daemon-service:2376"
       volumes:
         - name: dind-storage
           emptyDir: {}
-      initContainers:
-        - name: wait-for-docker
-          image: docker:24.0.0-rc.1-dind 
-          securityContext:
-            privileged: true
-            runAsUser: 0
-            runAsGroup: 0
-          env:
-            - name: DOCKER_HOST
-              value: "tcp://0.0.0.0:2376"
-          command:
-            - sh
-            - -c
-            - |
-              dockerd --host=tcp://0.0.0.0:2376 --host=unix:///var/run/docker.sock & \
-              for i in $(seq 1 60); do docker -H tcp://0.0.0.0:2376 info && break || echo waiting for docker && sleep 5; done

@@ -20,32 +20,32 @@ public class Build {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "repository_id", nullable = false)
+    @JoinColumn(name = "repository_id", foreignKey = @ForeignKey(name = "FK_BUILD_REPOSITORY"))
     private CICD CICD;
 
-    @Column(name = "repository_number", nullable = false)
-    private Integer repositoryNumber;
+    @Column(name = "last_commit_message", nullable = false)
+    private String lastCommitMessage;
 
     @Column(name = "build_number", nullable = false)
     private Integer buildNumber;
 
-    @Column(name = "build_status", nullable = false) // 0이면 빌드중, 1이면 빌드 성공, 2이면 빌드 실패
-    private Integer buildStatus;
+    @Column(name = "build_status", nullable = false)
+    private String buildStatus;
 
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public Build(CICD CICD, Integer repositoryNumber, Integer buildNumber, Integer buildStatus) {
+    public Build(CICD CICD, String lastCommitMessage, Integer buildNumber, String buildStatus) {
         this.CICD = CICD;
-        this.repositoryNumber = repositoryNumber;
+        this.lastCommitMessage = lastCommitMessage;
         this.buildNumber = buildNumber;
         this.buildStatus = buildStatus;
         this.createdAt = LocalDateTime.now();
     }
 
-    public void update(Integer buildStatus) {
+    public void update(String buildStatus) {
         this.buildStatus = buildStatus;
     }
 }

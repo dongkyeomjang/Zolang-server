@@ -84,68 +84,86 @@ public class ClusterService {
         VersionApi versionApi = new VersionApi(client);
         return versionApi.getCode().execute().getGitVersion();
     }
-    @Transactional
+
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
-        // 클러스터를 EKS에 생성
-        CreateClusterRequest request = CreateClusterRequest.builder()
-                .name(clusterName)
-                .roleArn(eksRoleArn)
-                .resourcesVpcConfig(VpcConfigRequest.builder()
-                        .subnetIds(subnetId1, subnetId2)
-                        .securityGroupIds(securityGroupId1, securityGroupId2)
-                        .endpointPublicAccess(true)
-                        .endpointPrivateAccess(true)
-                        .build())
-                .version(version)
-                .kubernetesNetworkConfig(config -> config.ipFamily("IPV4").build())
-                .build();
-
-        eksClient.createCluster(request);
-
-        // 클러스터 정보를 DB에 저장
+        // 클러스터 상태를 'creating'으로 설정하고 DB에 저장
         Cluster cluster = clusterRepository.save(
                 Cluster.builder()
                         .user(userRepository.findById(userId)
                                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER)))
                         .clusterName(clusterName)
                         .provider("zolang")
-                        .secretToken("") // 초기에는 빈 값으로 설정
-                        .domainUrl("") // 초기에는 빈 값으로 설정
-                        .version("") // 초기에는 빈 값으로 설정
+                        .secretToken("")
+                        .domainUrl("")
+                        .version("")
+                        .status("creating")
                         .build()
         );
 
-        waitForClusterToBeActiveAndCreateNodeGroup(clusterName, clusterName + "-nodegroup");
-
-        // 생성이 완료되면 클러스터 정보를 다시 가져옴
-        DescribeClusterRequest describeClusterRequest = DescribeClusterRequest.builder()
-                .name(clusterName)
-                .build();
-
-        DescribeClusterResponse response = eksClient.describeCluster(describeClusterRequest);
-
-        software.amazon.awssdk.services.eks.model.Cluster eksCluster = response.cluster();
-
-
-        // Kubeconfig 파일 생성 및 설정
-        clusterUtil.createKubeconfig(cluster);
-
-        // 서비스 계정 및 역할 생성
-        clusterUtil.createServiceAccountWithKubectl(cluster);
-
-        // 서비스 계정 토큰 가져오기
-        String secretToken = clusterUtil.getServiceAccountTokenWithKubectl(cluster);
-
-        // 도메인 url에서 https:// 제거
-        String domainUrl = eksCluster.endpoint().replace("https://", "");
-
-        // 클러스터 정보 업데이트
-        cluster.update(clusterName, secretToken, domainUrl, version);
-        clusterRepository.save(cluster);
-
-        clusterUtil.installAndConfigureMetricsServer();
+        // 비동기적으로 클러스터 생성
+        createClusterAsync(cluster.getId(), clusterName);
 
         return ClusterCreateResponseDto.fromEntity(cluster);
+    }
+
+    @Async
+    public void createClusterAsync(Long clusterId, String clusterName) {
+        try {
+            // 클러스터를 EKS에 생성
+            CreateClusterRequest request = CreateClusterRequest.builder()
+                    .name(clusterName)
+                    .roleArn(eksRoleArn)
+                    .resourcesVpcConfig(VpcConfigRequest.builder()
+                            .subnetIds(subnetId1, subnetId2)
+                            .securityGroupIds(securityGroupId1, securityGroupId2)
+                            .endpointPublicAccess(true)
+                            .endpointPrivateAccess(true)
+                            .build())
+                    .version(version)
+                    .kubernetesNetworkConfig(config -> config.ipFamily("IPV4").build())
+                    .build();
+
+            eksClient.createCluster(request);
+
+            // 클러스터 생성 상태 확인 및 노드 그룹 생성
+            waitForClusterToBeActiveAndCreateNodeGroup(clusterName, clusterName + "-nodegroup");
+
+            // 생성이 완료되면 클러스터 정보를 다시 가져옴
+            DescribeClusterRequest describeClusterRequest = DescribeClusterRequest.builder()
+                    .name(clusterName)
+                    .build();
+
+            DescribeClusterResponse response = eksClient.describeCluster(describeClusterRequest);
+
+            software.amazon.awssdk.services.eks.model.Cluster eksCluster = response.cluster();
+
+            // Kubeconfig 파일 생성 및 설정
+            Cluster cluster = clusterRepository.findById(clusterId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            clusterUtil.createKubeconfig(cluster);
+
+            // 서비스 계정 및 역할 생성
+            clusterUtil.createServiceAccountWithKubectl(cluster);
+
+            // 서비스 계정 토큰 가져오기
+            String secretToken = clusterUtil.getServiceAccountTokenWithKubectl(cluster);
+
+            // 도메인 url에서 https:// 제거
+            String domainUrl = eksCluster.endpoint().replace("https://", "");
+
+            // 클러스터 정보 업데이트
+            cluster.update(clusterName, secretToken, domainUrl, version);
+            cluster.updateStatus("ready");
+            clusterRepository.save(cluster);
+
+            clusterUtil.installAndConfigureMetricsServer();
+
+        } catch (Exception e) {
+            log.error("Exception occurred while creating cluster asynchronously", e);
+            Cluster cluster = clusterRepository.findById(clusterId)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            clusterRepository.delete(cluster);
+        }
     }
 
     private void createNodeGroup(String clusterName, String nodegroupName) {
@@ -177,7 +195,7 @@ public class ClusterService {
         CreateLaunchTemplateRequest request = CreateLaunchTemplateRequest.builder()
                 .launchTemplateName("eks-launch-template" + UUID.randomUUID())
                 .launchTemplateData(RequestLaunchTemplateData.builder()
-                        .imageId("ami-0d989729759ea3477") // Amazon Linux 2 arm64 EKS Optimized AMI ID
+                        .imageId("ami-0d989729759ea3477")
                         .instanceType("t4g.medium")
                         .keyName("bongousse")
                         .securityGroupIds(securityGroupId1, securityGroupId2)
@@ -189,7 +207,7 @@ public class ClusterService {
         return response.launchTemplate().launchTemplateId();
     }
 
-    private String getUserDataScript(String clusterName) { // 노드 초기화 스크립트
+    private String getUserDataScript(String clusterName) {
         return "#!/bin/bash\n" +
                 "set -o xtrace\n" +
                 "yum update -y\n" +
@@ -212,7 +230,7 @@ public class ClusterService {
                     break;
                 }
 
-                Thread.sleep(30000); // 30초 대기
+                Thread.sleep(30000);
             }
             createNodeGroup(clusterName, nodegroupName);
         } catch (InterruptedException e) {
@@ -240,40 +258,42 @@ public class ClusterService {
 
 
     public List<ClusterListDto> getClusters(Long userId) {
-        return clusterRepository.findByUserId(userId).stream() // 사용자가 웹서비스에 등록해놓은 클러스터 리스트 가져와서
-                .map(ClusterListDto::fromEntity) // ClusterListDto로 변환하고
-                .toList(); // List로 합친 후 리턴. 반환값: clusterName, domainUrl, version(DB에 저장되어있는 값들만) Status를 위한 값은 추가로 구현해야함(저장 값 먼저 출력 후, 약간 시간이 걸릴 수 있는 status는 로딩 후 나타나게)
-    }
-
-    //현재 클러스터 상태
-    public Boolean getClusterStatus(Long userId, Long clusterId) throws Exception {
-
-        ApiClient client = monitoringUtil.getV1Api(userId, clusterId);
-        CoreV1Api coreV1Api = new CoreV1Api(client);
-
-        try {
-            V1NodeList nodeList = coreV1Api.listNode().execute();
-            List<V1Node> nodes = nodeList.getItems();
-
-            for (V1Node node : nodes) {
-                List<V1NodeCondition> conditions = node.getStatus().getConditions();
-                //추후 for문 수정 예정
-                for (V1NodeCondition condition : conditions) {
-                    if ("Ready".equals(condition.getType())) {
-                        if (!"True".equals(condition.getStatus())) {
-                            return false;
+        return clusterRepository.findByUserId(userId).stream()
+                .peek(cluster -> {
+                    if (!"creating".equals(cluster.getStatus())) {
+                        CoreV1Api coreV1Api = new CoreV1Api(monitoringUtil.getV1Api(userId, cluster.getId()));
+                        boolean hasError = false;
+                        try {
+                            List<V1Node> nodes = coreV1Api.listNode().execute().getItems();
+                            for (V1Node node : nodes) {
+                                V1NodeStatus status = node.getStatus();
+                                if (status == null) {
+                                    hasError = true;
+                                    break;
+                                }
+                                List<V1NodeCondition> conditions = status.getConditions();
+                                if (conditions == null) {
+                                    hasError = true;
+                                    break;
+                                }
+                                for (V1NodeCondition condition : conditions) {
+                                    if ("Ready".equals(condition.getType()) && !"True".equals(condition.getStatus())) {
+                                        hasError = true;
+                                        break;
+                                    }
+                                }
+                                if (hasError) break;
+                            }
+                        } catch (ApiException e) {
+                            hasError = true;
                         }
-                    }
-                }
-            }
-            return true;
-        } catch (ApiException e) {
-            log.error("Error listing services: {}", e.getResponseBody(), e);
-            //오류 코드 수정 예정
-            throw new CommonException(ErrorCode.API_ERROR);
-        }
+                        cluster.updateStatus(hasError ? "error" : "ready");
+                        clusterRepository.save(cluster);
+                    } // creating(생성중) 상태 클러스터는 상태 업데함트 안함
+                })
+                .map(ClusterListDto::fromEntity)
+                .toList();
     }
-
     //노드 사용량
     private NodeUsageDto getNodeUsage(NodeMetrics nodeMetrics) {
         return NodeUsageDto.fromEntity(nodeMetrics, LocalDateTime.now().format(DateTimeFormatter.ofPattern("HH:mm")));
@@ -426,7 +446,9 @@ public class ClusterService {
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
-
-
-
+    public void deleteCluster(Long userId, Long clusterId) {
+        Cluster cluster = clusterRepository.findByIdAndUserId(clusterId, userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+        clusterRepository.delete(cluster);
+    }
 }
