@@ -119,11 +119,9 @@ public class CICDService {
 
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
-            log.info("Received webhook payload: {}", payload);
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
 
-            // 리포지토리 이름 추출
             JsonNode repositoryNode = rootNode.path("repository");
             if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
@@ -131,24 +129,40 @@ public class CICDService {
             String repoName = repositoryNode.path("name").asText();
             log.info("Repository name: {}", repoName);
 
-            // 브랜치 이름 추출
-            JsonNode checkSuiteNode = rootNode.path("check_suite");
-            if (checkSuiteNode.isMissingNode() || !checkSuiteNode.has("head_branch")) {
-                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
-            }
-            String branch = checkSuiteNode.path("head_branch").asText();
-            log.info("Branch name: {}", branch);
 
-            // 커밋 메시지 추출
-            JsonNode headCommitNode = checkSuiteNode.path("head_commit");
-            if (headCommitNode.isMissingNode() || !headCommitNode.has("message")) {
+            String eventType = null;
+
+            // Event type 확인
+            if (rootNode.has("ref")) {
+                eventType = "push";
+            } else if (rootNode.has("pull_request")) {
+                eventType = "pull_request";
+            } else {
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
-            String lastCommitMessage = headCommitNode.path("message").asText();
+
+            String branch = null;
+            String lastCommitMessage = null;
+
+            switch (eventType) {
+                case "push":
+                    branch = rootNode.path("ref").asText().replace("refs/heads/", "");
+                    lastCommitMessage = rootNode.path("head_commit").path("message").asText();
+                    break;
+                case "pull_request":
+                    JsonNode pullRequestNode = rootNode.path("pull_request");
+                    branch = pullRequestNode.path("head").path("ref").asText();
+                    lastCommitMessage = pullRequestNode.path("head").path("sha").asText();
+                    break;
+                default:
+                    throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+
+            log.info("Branch name: {}", branch);
             log.info("Last commit message: {}", lastCommitMessage);
+
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
-
             if (!cicd.getBranch().equals(branch)) {
                 log.info("Ignoring webhook event for branch: {}", branch);
                 return;
