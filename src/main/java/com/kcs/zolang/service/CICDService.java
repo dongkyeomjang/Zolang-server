@@ -149,6 +149,7 @@ public class CICDService {
                 throw new CommonException(ErrorCode.PIPELINE_ERROR);
             }
         } catch (Exception e) {
+            log.error("Failed to process webhook", e);
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
     }
