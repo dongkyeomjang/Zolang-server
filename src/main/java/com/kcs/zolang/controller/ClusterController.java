@@ -34,6 +34,7 @@ public class ClusterController {
             ) throws IOException {
         return ResponseDto.created(clusterService.registerCluster(userId, registerClusterDto));
     }
+
     @PostMapping("/{cluster_name}")
     @Operation(summary = "클러스터 생성(Zolang으로부터 제공받은 클러스터)", description = "Zolang으로부터 제공받은 클러스터를 생성")
     public ResponseDto<?> createCluster(

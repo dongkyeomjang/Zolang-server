@@ -1,13 +1,17 @@
 package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
+import com.kcs.zolang.domain.Usage;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.response.UserUrlTokenDto;
+import com.kcs.zolang.dto.response.cluster.UserUsageDto;
 import com.kcs.zolang.dto.response.workload.UsageDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
+import com.kcs.zolang.repository.UsageRepository;
 import com.kcs.zolang.repository.UserRepository;
+import com.kcs.zolang.service.UserUsageService;
 import io.kubernetes.client.Metrics;
 import io.kubernetes.client.custom.PodMetrics;
 import io.kubernetes.client.openapi.ApiClient;

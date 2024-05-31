@@ -25,16 +25,11 @@ public class UserUsageController {
         return ResponseDto.ok(userUsageService.getUserUsage(userId));
     }
 
-//    @GetMapping("/dashboard/usage/period")
-//    @Operation(summary = "사용자 클러스터 사용량 조회", description = "사용자의 모든 클러스터 사용량 조회")
-//    public ResponseDto<?> getUserUsagePeriod(
-//            @UserId Long userId,
-//            @RequestParam(name="period") String period
-//
-//    ) throws Exception {
-//        return ResponseDto.ok(userUsageService.getUserUsagePeriod(userId,period));
-//    }
-//}
-
+    @GetMapping("/dashboard/usage/average")
+    @Operation(summary = "사용자 클러스터 사용량 평균 조회", description = "요청 날짜의 전날 평균 사용량 조회")
+    public ResponseDto<?> getUserUsageAverage(
+            @UserId Long userId
+    ) {
+        return ResponseDto.ok(userUsageService.getUserUsageAverage(userId));
+    }
 }
-
