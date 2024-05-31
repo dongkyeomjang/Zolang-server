@@ -9,7 +9,7 @@ public record ClusterListDto(
         String clusterName,
         String domainUrl,
         String version,
-        String status
+        String status,
         String provider
 ) {
     public static ClusterListDto fromEntity(Cluster cluster) {
