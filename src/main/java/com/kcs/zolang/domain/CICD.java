@@ -46,10 +46,15 @@ public class CICD {
     private LocalDateTime createdAt;
 
     @Builder
-    public CICD(User user, String repositoryName) {
+    public CICD(User user, String repositoryName, String branch, String language, String languageVersion, String buildTool, String trigger) {
         this.user = user;
         this.repositoryName = repositoryName;
         this.createdAt = LocalDateTime.now();
+        this.branch = branch;
+        this.language = language;
+        this.languageVersion = languageVersion;
+        this.buildTool = buildTool;
+        this.trigger = trigger;
     }
 
     public void update(String repositoryName) {
