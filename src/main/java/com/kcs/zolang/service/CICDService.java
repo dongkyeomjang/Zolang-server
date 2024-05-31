@@ -1,5 +1,7 @@
 package com.kcs.zolang.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kcs.zolang.domain.*;
 import com.kcs.zolang.dto.request.CICDRequestDto;
 import com.kcs.zolang.dto.request.EnvVarDto;
@@ -117,9 +119,32 @@ public class CICDService {
 
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
-            String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
-            String branch = (String) ((Map<String, Object>) payload.get("check_suite")).get("head_branch");
-            String lastCommitMessage = (String) ((Map<String,Object>)((Map<String, Object>) payload.get("check_suite")).get("head_commit")).get("message");
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
+
+            // 리포지토리 이름 추출
+            JsonNode repositoryNode = rootNode.path("repository");
+            if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+            String repoName = repositoryNode.path("name").asText();
+            log.info("Repository name: {}", repoName);
+
+            // 브랜치 이름 추출
+            JsonNode checkSuiteNode = rootNode.path("check_suite");
+            if (checkSuiteNode.isMissingNode() || !checkSuiteNode.has("head_branch")) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+            String branch = checkSuiteNode.path("head_branch").asText();
+            log.info("Branch name: {}", branch);
+
+            // 커밋 메시지 추출
+            JsonNode headCommitNode = checkSuiteNode.path("head_commit");
+            if (headCommitNode.isMissingNode() || !headCommitNode.has("message")) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+            String lastCommitMessage = headCommitNode.path("message").asText();
+            log.info("Last commit message: {}", lastCommitMessage);
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
 
