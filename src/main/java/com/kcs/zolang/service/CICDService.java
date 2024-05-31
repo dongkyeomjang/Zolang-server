@@ -1,18 +1,13 @@
 package com.kcs.zolang.service;
 
-import com.kcs.zolang.domain.Build;
-import com.kcs.zolang.domain.CICD;
-import com.kcs.zolang.domain.Cluster;
-import com.kcs.zolang.domain.User;
-import com.kcs.zolang.dto.request.GitRepoRequestDto;
+import com.kcs.zolang.domain.*;
+import com.kcs.zolang.dto.request.CICDRequestDto;
+import com.kcs.zolang.dto.request.EnvVarDto;
 import com.kcs.zolang.dto.response.BuildDto;
 import com.kcs.zolang.dto.response.CICDDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
-import com.kcs.zolang.repository.BuildRepository;
-import com.kcs.zolang.repository.CICDRepository;
-import com.kcs.zolang.repository.ClusterRepository;
-import com.kcs.zolang.repository.UserRepository;
+import com.kcs.zolang.repository.*;
 import com.kcs.zolang.utility.ClusterUtil;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -22,7 +17,6 @@ import org.springframework.http.HttpEntity;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
@@ -38,6 +32,7 @@ public class CICDService {
     private final BuildRepository buildRepository;
     private final UserRepository userRepository;
     private final ClusterRepository clusterRepository;
+    private final EnvVarRepository envVarRepository;
     private final RestTemplate restTemplate;
     private final ClusterUtil clusterUtil;
     private final StringEncryptor stringEncryptor;
@@ -45,7 +40,7 @@ public class CICDService {
     @Value("${github.webhook-url}")
     private String webhookUrl;
 
-    public void registerRepository(Long userId, GitRepoRequestDto requestDto) {
+    public void registerRepository(Long userId, CICDRequestDto requestDto) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
         Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
@@ -59,7 +54,7 @@ public class CICDService {
             Map<String, Object> body = new HashMap<>();
             body.put("name", "web");
             body.put("active", true);
-            body.put("events", Arrays.asList("push", "pull_request"));
+            body.put("events", requestDto.trigger());
 
             Map<String, String> config = new HashMap<>();
             config.put("url", webhookUrl);
@@ -83,9 +78,21 @@ public class CICDService {
             CICD cicd = CICD.builder()
                     .user(user)
                     .repositoryName(requestDto.repoName())
+                    .branch(requestDto.branch())
+                    .language(requestDto.language())
+                    .languageVersion(requestDto.version())
+                    .buildTool(requestDto.buildTool())
+                    .trigger(String.join(",", requestDto.trigger()))
                     .build();
             cicdRepository.save(cicd);
-
+            for (EnvVarDto envVarDto : requestDto.envVars()){
+                EnvVar envVar = EnvVar.builder()
+                        .key(envVarDto.key())
+                        .value(envVarDto.value())
+                        .CICD(cicd)
+                        .build();
+                envVarRepository.save(envVar);
+            }
             Build build = Build.builder()
                             .CICD(cicd)
                             .buildStatus("building")
@@ -95,7 +102,8 @@ public class CICDService {
             buildRepository.save(build);
 
             try {
-                clusterUtil.runPipeline(cicd, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
+                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
+                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
@@ -111,8 +119,16 @@ public class CICDService {
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
             String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
+            String ref = (String) payload.get("ref");
+            String branch = ref.substring(ref.lastIndexOf("/") + 1);
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+
+            if (!cicd.getBranch().equals(branch)) {
+                log.info("Ignoring webhook event for branch: {}", branch);
+                return;
+            }
+
             Long userId = cicd.getUser().getId();
             Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
@@ -124,7 +140,8 @@ public class CICDService {
                     .build();
             buildRepository.save(build);
             try {
-                clusterUtil.runPipeline(cicd, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
+                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
+                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
@@ -149,5 +166,14 @@ public class CICDService {
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
         List<Build> buildList = buildRepository.findByCICD(cicd);
         return buildList.stream().map(BuildDto::fromEntity).toList();
+    }
+
+    public void deleteRepository(Long userId, Long cicdId) {
+        CICD cicd = cicdRepository.findById(cicdId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+        if (!cicd.getUser().getId().equals(userId)) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
+        cicdRepository.delete(cicd);
     }
 }

@@ -2,8 +2,11 @@ package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.CICD;
+import com.kcs.zolang.domain.EnvVar;
+import com.kcs.zolang.dto.request.EnvVarDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
+import com.kcs.zolang.utility.BuildTool.*;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
@@ -20,10 +23,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 @Slf4j
@@ -144,7 +144,6 @@ public class ClusterUtil {
         try {
             String clusterName = cluster.getClusterName();
             String saName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "sa";
-            String secretName = saName + "-token";
 
             // 서비스 계정 토큰을 가져오기 위한 시크릿 이름 가져오기
             String getSecretNameCommand = String.format("kubectl get secrets --namespace default -o jsonpath=\"{.items[?(@.metadata.annotations['kubernetes\\.io/service-account\\.name']=='%s')].metadata.name}\"", saName);
@@ -164,7 +163,7 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-    public void rolloutDeployment(CICD cicd, Cluster cluster) {
+    public void rolloutDeployment(CICD cicd, Cluster cluster, List<EnvVar> envVars) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
@@ -175,7 +174,7 @@ public class ClusterUtil {
             log.info("Deleted existing deployment: {}", cicd.getRepositoryName());
 
             // 새로운 Deployment 생성
-            String deploymentYaml = generateDeploymentYaml(cicd);
+            String deploymentYaml = generateDeploymentYaml(cicd, envVars);
             applyYamlToCluster(deploymentYaml, cluster);
             log.info("Applied new deployment: {}", cicd.getRepositoryName());
 
@@ -185,7 +184,7 @@ public class ClusterUtil {
     }
 
     @Async
-    public CompletableFuture<Void> runPipeline(CICD cicd, Cluster cluster, Boolean isFirstRun) {
+    public CompletableFuture<Void> runPipeline(CICD cicd, List<EnvVar> envVars, Cluster cluster, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
             String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
@@ -196,12 +195,12 @@ public class ClusterUtil {
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
             }
 
-            if (!new File(repoDir + "/gradlew").exists() || !new File(repoDir + "/gradle/wrapper/gradle-wrapper.jar").exists()) {
-                log.info("Gradle wrapper 없음. 생성 중");
-                executeCommand("cd " + repoDir + " && gradle wrapper --gradle-version 8.0.2");
+            BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicd.getBuildTool());
+            String setupCommand = buildTool.setup(repoDir);
+            if (setupCommand != null) {
+                executeCommand(setupCommand);
             }
-
-            executeCommand("cd " + repoDir + " && ./gradlew build -x test");
+            executeCommand(buildTool.build(repoDir));
 
             String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
                     awsRegion, awsAccountId, awsRegion);
@@ -216,9 +215,9 @@ public class ClusterUtil {
             executeCommand(String.format("docker push %s", imageName));
 
             if (isFirstRun) {
-                applyYamlToCluster(generateDeploymentYaml(cicd), cluster);
+                applyYamlToCluster(generateDeploymentYaml(cicd,envVars), cluster);
             } else {
-                rolloutDeployment(cicd, cluster);
+                rolloutDeployment(cicd, cluster, envVars);
             }
             return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
@@ -226,7 +225,16 @@ public class ClusterUtil {
         }
     }
 
-    private String generateDeploymentYaml(CICD cicd) {
+    private String generateDeploymentYaml(CICD cicd, List<EnvVar> envVars) {
+        StringBuilder envVarsBuilder = new StringBuilder();
+        if(envVars != null){
+            for (EnvVar envVar : envVars) {
+                envVarsBuilder.append(String.format(
+                        "        - name: %s\n" +
+                                "          value: %s\n", envVar.getKey(), envVar.getValue()));
+            }
+        }
+
         String deploymentName = cicd.getRepositoryName();
         String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
                 awsAccountId, awsRegion, ecrRepositoryPrefix, cicd.getRepositoryName());
@@ -250,8 +258,9 @@ public class ClusterUtil {
                         "      - name: %s\n" +
                         "        image: %s\n" +
                         "        ports:\n" +
-                        "        - containerPort: 8080\n",
-                deploymentName, deploymentName, deploymentName, deploymentName, imageName);
+                        "        - containerPort: 8080\n" +
+                        "%s",
+                deploymentName, deploymentName, deploymentName, deploymentName, imageName, envVarsBuilder.toString());
     }
     private String generateKubeConfig(Cluster cluster) {
         return String.format(
