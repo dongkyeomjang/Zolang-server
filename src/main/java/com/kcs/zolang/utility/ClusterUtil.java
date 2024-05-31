@@ -4,6 +4,7 @@ import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.CICD;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
+import com.kcs.zolang.utility.BuildTool.*;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
@@ -20,10 +21,7 @@ import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
 
 import java.io.*;
-import java.time.Instant;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.concurrent.*;
 
 @Slf4j
@@ -196,12 +194,12 @@ public class ClusterUtil {
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
             }
 
-            if (!new File(repoDir + "/gradlew").exists() || !new File(repoDir + "/gradle/wrapper/gradle-wrapper.jar").exists()) {
-                log.info("Gradle wrapper 없음. 생성 중");
-                executeCommand("cd " + repoDir + " && gradle wrapper --gradle-version 8.0.2");
+            BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicd.getBuildTool());
+            String setupCommand = buildTool.setup(repoDir);
+            if (setupCommand != null) {
+                executeCommand(setupCommand);
             }
-
-            executeCommand("cd " + repoDir + " && ./gradlew build -x test");
+            executeCommand(buildTool.build(repoDir));
 
             String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
                     awsRegion, awsAccountId, awsRegion);
