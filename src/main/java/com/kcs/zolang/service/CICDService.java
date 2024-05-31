@@ -150,4 +150,13 @@ public class CICDService {
         List<Build> buildList = buildRepository.findByCICD(cicd);
         return buildList.stream().map(BuildDto::fromEntity).toList();
     }
+
+    public void deleteRepository(Long userId, Long cicdId) {
+        CICD cicd = cicdRepository.findById(cicdId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+        if (!cicd.getUser().getId().equals(userId)) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
+        cicdRepository.delete(cicd);
+    }
 }

@@ -27,4 +27,10 @@ public class CICDController {
         return ResponseDto.ok(cicdService.getBuildRecords(repository_id));
     }
 
+    @DeleteMapping("{repository_id}")
+    public ResponseDto<?> deleteRepository(@UserId Long userId, @PathVariable Long repository_id) {
+        cicdService.deleteRepository(userId, repository_id);
+        return ResponseDto.ok(null);
+    }
+
 }
