@@ -64,7 +64,11 @@ public enum ErrorCode {
     FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다."),
     PIPELINE_ERROR(50006, HttpStatus.INTERNAL_SERVER_ERROR, "파이프라인 실행에 실패하였습니다."),
     GRADLE_FILE_ERROR(50007, HttpStatus.INTERNAL_SERVER_ERROR, "그레이들 빌드에 실패하였습니다."),
-    FAILED_PROCESS_WEBHOOK(50008, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 처리에 실패하였습니다.");
+    FAILED_PROCESS_WEBHOOK(50008, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 처리에 실패하였습니다."),
+
+    // 개발자가 직접 정의한 에러
+    ALREADY_EXIST_ZOLANG_CLUSTER(60000, HttpStatus.BAD_REQUEST, "Zolang에서 생성할 수 있는 클러스터는 최대 1개입니다.");
+
 
     private final Integer code;
     private final HttpStatus httpStatus;

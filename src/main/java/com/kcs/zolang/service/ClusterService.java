@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -87,6 +88,10 @@ public class ClusterService {
 
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
         // 클러스터 상태를 'creating'으로 설정하고 DB에 저장
+        clusterRepository.findByProviderAndUserId("zolang", userId)
+                .ifPresent(cluster -> {
+                    throw new CommonException(ErrorCode.ALREADY_EXIST_ZOLANG_CLUSTER);
+                });
         Cluster cluster = clusterRepository.save(
                 Cluster.builder()
                         .user(userRepository.findById(userId)
