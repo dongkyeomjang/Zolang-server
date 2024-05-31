@@ -117,10 +117,8 @@ public class CICDService {
 
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
-            log.info("Received webhook event: {}", payload);
             String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
-            String ref = (String) payload.get("ref");
-            String branch = ref.substring(ref.lastIndexOf("/") + 1);
+            String branch = (String) ((Map<String, Object>) payload.get("check_suite")).get("head_branch");
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
 
