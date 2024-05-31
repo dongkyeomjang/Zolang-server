@@ -11,4 +11,7 @@ import java.util.List;
 
 public interface UsageRepository extends JpaRepository<Usage, Long> {
     List<Usage> findAllByUserIdAndCreatedAtBetween(Long userId, LocalDateTime start, LocalDateTime end);
+
+    // usage 데이터 삭제
+    void deleteByCreatedAtBefore(LocalDateTime thresholdDate);
 }

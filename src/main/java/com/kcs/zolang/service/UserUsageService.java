@@ -22,6 +22,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -112,7 +113,7 @@ public class UserUsageService {
         );
     }
 
-    @Scheduled(cron = "0 0 * * * *") // 1시간마다 실행
+    @Scheduled(cron = "0 0 * * * *") // 1시간마다 데이터 저장
     public void saveHourlyUserUsage() {
         List<User> users = userRepository.findAll();
         for (User user : users) {
@@ -138,6 +139,15 @@ public class UserUsageService {
         }
     }
 
+    @Transactional
+    @Scheduled(cron = "0 0 0 * * *") // 정각마다 5일전 데이터 삭제
+    public void deleteOldUsages() {
+        LocalDateTime thresholdDate = LocalDateTime.now().minusSeconds(10);
+        usageRepository.deleteByCreatedAtBefore(thresholdDate);
+        log.info("Old usage data deleted up to: " + thresholdDate);
+    }
+
+    //1일전 데이터 내보내기
     public UserUsageDto getUserUsageAverage(Long userId) {
         LocalDate date = LocalDate.now();
         LocalDateTime startOfDay = date.minusDays(1).atStartOfDay();
