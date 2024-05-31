@@ -133,9 +133,7 @@ public class UserUsageService {
                         .build();
 
                 usageRepository.save(usage);
-                log.info("Usage data saved for user: " + user.getId());
             } catch (Exception e) {
-                log.error("Failed to save usage for user " + user.getId(), e);
             }
         }
     }
