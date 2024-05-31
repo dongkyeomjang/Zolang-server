@@ -113,7 +113,7 @@ public class UserUsageService {
         );
     }
 
-    @Scheduled(cron = "0/10 * * * * *") // 1시간마다 실행
+    @Scheduled(cron = "0 0 * * * *") // 1시간마다 데이터 저장
     public void saveHourlyUserUsage() {
         List<User> users = userRepository.findAll();
         for (User user : users) {
@@ -140,7 +140,7 @@ public class UserUsageService {
     }
 
     @Transactional
-    @Scheduled(cron = "0 0 0 * * *") // 10초마다 실행
+    @Scheduled(cron = "0 0 0 * * *") // 정각마다 5일전 데이터 삭제
     public void deleteOldUsages() {
         LocalDateTime thresholdDate = LocalDateTime.now().minusSeconds(10);
         usageRepository.deleteByCreatedAtBefore(thresholdDate);
