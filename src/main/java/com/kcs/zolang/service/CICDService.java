@@ -119,6 +119,7 @@ public class CICDService {
 
     public void handleGithubWebhook(Map<String, Object> payload) {
         try {
+            log.info("Received webhook payload: {}", payload);
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
 
