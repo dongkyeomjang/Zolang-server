@@ -20,7 +20,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -86,12 +85,12 @@ public class CICDService {
                     .build();
             cicdRepository.save(cicd);
             for (EnvVarDto envVarDto : requestDto.envVars()){
-                EnvVar envVar = EnvVar.builder()
+                EnvironmentVariable environmentVariable = EnvironmentVariable.builder()
                         .key(envVarDto.key())
                         .value(envVarDto.value())
                         .CICD(cicd)
                         .build();
-                envVarRepository.save(envVar);
+                envVarRepository.save(environmentVariable);
             }
             Build build = Build.builder()
                             .CICD(cicd)
@@ -102,8 +101,8 @@ public class CICDService {
             buildRepository.save(build);
 
             try {
-                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
-                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
+                List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                clusterUtil.runPipeline(cicd, environmentVariables, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
@@ -140,8 +139,8 @@ public class CICDService {
                     .build();
             buildRepository.save(build);
             try {
-                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
-                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
+                List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                clusterUtil.runPipeline(cicd, environmentVariables, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {

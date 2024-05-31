@@ -2,8 +2,7 @@ package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.CICD;
-import com.kcs.zolang.domain.EnvVar;
-import com.kcs.zolang.dto.request.EnvVarDto;
+import com.kcs.zolang.domain.EnvironmentVariable;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.BuildTool.*;
@@ -119,10 +118,10 @@ public class ClusterUtil {
                     "  name: %s\n" +
                     "rules:\n" +
                     "- apiGroups: [\"\"]\n" +
-                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\", \"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
                     "- apiGroups: [\"metrics.k8s.io\"]\n" +
-                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\",\"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
                     "EOF", roleName);
             log.info("Executing command: {}", roleCommand);
@@ -163,7 +162,7 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-    public void rolloutDeployment(CICD cicd, Cluster cluster, List<EnvVar> envVars) {
+    public void rolloutDeployment(CICD cicd, Cluster cluster, List<EnvironmentVariable> environmentVariables) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
@@ -174,7 +173,7 @@ public class ClusterUtil {
             log.info("Deleted existing deployment: {}", cicd.getRepositoryName());
 
             // 새로운 Deployment 생성
-            String deploymentYaml = generateDeploymentYaml(cicd, envVars);
+            String deploymentYaml = generateDeploymentYaml(cicd, environmentVariables);
             applyYamlToCluster(deploymentYaml, cluster);
             log.info("Applied new deployment: {}", cicd.getRepositoryName());
 
@@ -184,7 +183,7 @@ public class ClusterUtil {
     }
 
     @Async
-    public CompletableFuture<Void> runPipeline(CICD cicd, List<EnvVar> envVars, Cluster cluster, Boolean isFirstRun) {
+    public CompletableFuture<Void> runPipeline(CICD cicd, List<EnvironmentVariable> environmentVariables, Cluster cluster, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
             String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
@@ -215,9 +214,9 @@ public class ClusterUtil {
             executeCommand(String.format("docker push %s", imageName));
 
             if (isFirstRun) {
-                applyYamlToCluster(generateDeploymentYaml(cicd,envVars), cluster);
+                applyYamlToCluster(generateDeploymentYaml(cicd, environmentVariables), cluster);
             } else {
-                rolloutDeployment(cicd, cluster, envVars);
+                rolloutDeployment(cicd, cluster, environmentVariables);
             }
             return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
@@ -225,13 +224,14 @@ public class ClusterUtil {
         }
     }
 
-    private String generateDeploymentYaml(CICD cicd, List<EnvVar> envVars) {
+    private String generateDeploymentYaml(CICD cicd, List<EnvironmentVariable> environmentVariables) {
         StringBuilder envVarsBuilder = new StringBuilder();
-        if(envVars != null){
-            for (EnvVar envVar : envVars) {
+        if (environmentVariables != null && !environmentVariables.isEmpty()) {
+            envVarsBuilder.append("        env:\n");
+            for (EnvironmentVariable environmentVariable : environmentVariables) {
                 envVarsBuilder.append(String.format(
                         "        - name: %s\n" +
-                                "          value: %s\n", envVar.getKey(), envVar.getValue()));
+                                "          value: %s\n", environmentVariable.getKey(), environmentVariable.getValue()));
             }
         }
 
