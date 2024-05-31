@@ -120,7 +120,7 @@ public class CICDService {
             String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
             Map<String,Object> checkSuite = (Map<String, Object>) payload.get("check_suite");
             String branch = (String) checkSuite.get("head_branch");
-            String lastCommitMessage = (String) ((Map<String, Object>) payload.get("head_commit")).get("message");
+            String lastCommitMessage =(String) ((Map<String,Object>) checkSuite.get("head_commit")).get("message");
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
 
