@@ -38,7 +38,7 @@ public class CICD {
     @Column(name = "build_tool", nullable = false)
     private String buildTool;
 
-    @Column(name = "trigger", nullable = false)
+    @Column(name = "z_trigger", nullable = false)
     private String trigger;
 
     @CreatedDate
