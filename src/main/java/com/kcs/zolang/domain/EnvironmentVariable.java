@@ -9,7 +9,8 @@ import lombok.NoArgsConstructor;
 @Entity
 @Getter
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
-public class EnvVar {
+@Table(name = "environment_variable")
+public class EnvironmentVariable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
@@ -25,7 +26,7 @@ public class EnvVar {
     private CICD CICD;
 
     @Builder
-    public EnvVar(String key, String value, CICD CICD) {
+    public EnvironmentVariable(String key, String value, CICD CICD) {
         this.key = key;
         this.value = value;
         this.CICD = CICD;
