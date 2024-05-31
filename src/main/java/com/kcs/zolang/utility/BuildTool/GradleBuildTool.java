@@ -1,6 +1,5 @@
 package com.kcs.zolang.utility.BuildTool;
 
-import com.kcs.zolang.utility.BuildTool.BuildTool;
 import lombok.extern.slf4j.Slf4j;
 
 import java.io.File;
@@ -14,6 +13,9 @@ public class GradleBuildTool implements BuildTool {
         if (!new File(repoDir + "/gradlew").exists() || !new File(repoDir + "/gradle/wrapper/gradle-wrapper.jar").exists()) {
             log.info("Gradle wrapper 없음. 생성 중");
             return "cd " + repoDir + " && gradle wrapper --gradle-version 8.0.2";
+        }
+        else {
+            return null;
         }
     }
 
