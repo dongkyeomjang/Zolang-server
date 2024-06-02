@@ -111,7 +111,7 @@ public class WorkloadService {
 
     public PodListDto getPodList(Long userId, Long clusterId, String continueToken) {
         monitoringUtil.getV1Api(userId, clusterId);
-        int m = LocalDateTime.now().getMinute();
+        int m = getMinute(clusterId);
         try {
             CoreV1Api coreV1Api = new CoreV1Api();
             V1PodList podList = coreV1Api.listPodForAllNamespaces().limit(10)
@@ -123,7 +123,7 @@ public class WorkloadService {
                 m);
 
             List<String> totalKeys = new ArrayList<>();
-            for (int i = 13; i > 0; i--) {
+            for (int i = 26; i > 0; i -= 2) {
                 totalKeys.add(
                     "cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m - i)) % 60));
             }
@@ -144,7 +144,7 @@ public class WorkloadService {
 
     public PodListDto getPodListByNamespace(Long userId, String namespace, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
-        int m = LocalDateTime.now().minusSeconds(10).getMinute();
+        int m = getMinute(clusterId);
         try {
             //파드 사용량 추출
             CoreV1Api coreV1Api = new CoreV1Api();
@@ -155,7 +155,7 @@ public class WorkloadService {
             List<PodSimpleDto> podSimpleDtoList = getPodSimpleDtoList(clusterId, podList.getItems(),
                 m);
             List<String> keys = new ArrayList<>();
-            for (int i = 13; i > 0; i--) {
+            for (int i = 26; i > 0; i -= 2) {
                 keys.add("cluster-usage:" + clusterId + ":" + namespace + ":" + (
                     (60 + (m - i)) % 60));
             }
@@ -175,7 +175,7 @@ public class WorkloadService {
 
     public PodDetailDto getPodDetail(Long userId, String name, String namespace, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
-        int m = LocalDateTime.now().getMinute();
+        int m = getMinute(clusterId);
         try {
             List<UsageDto> podUsage = getPodMetrics(clusterId, name, m);
             CoreV1Api coreV1Api = new CoreV1Api();
@@ -558,9 +558,10 @@ public class WorkloadService {
 
     public PodMetricsDto getControllerPodMetrics(Long userId, String name, Long clusterId) {
         monitoringUtil.getV1Api(userId, clusterId);
-        int m = LocalDateTime.now().minusSeconds(10).getMinute();
+        int m = getMinute(clusterId);
         String key = "cluster-usage:" + clusterId + ":" + name + ":" + m;
-        return PodMetricsDto.fromEntity(getUsage(List.of(key)).get(0),
+        UsageDto usageDto = getUsage(List.of(key)).get(0);
+        return PodMetricsDto.fromEntity(usageDto,
             getPodMetrics(clusterId, name, m));
     }
 
@@ -679,7 +680,7 @@ public class WorkloadService {
 
     private List<UsageDto> getPodMetrics(Long clusterId, String name, int m) {
         List<String> keys = new ArrayList<>();
-        for (int i = 13; i > 0; i--) {
+        for (int i = 26; i > 0; i = i - 2) {
             keys.add("cluster-usage:" + clusterId + ":" + name + ":" + ((60 + (m - i)) % 60));
         }
         return getUsage(keys);
@@ -750,5 +751,17 @@ public class WorkloadService {
             startCount++;
         }
         return startCount;
+    }
+
+    private int getMinute(Long clusterId) {
+        int m = LocalDateTime.now().minusSeconds(10).getMinute();
+        for (int i = 0; i < 2; i++) {
+            if (getUsage(List.of(
+                "cluster-usage:" + clusterId + ":totalCpuUsage:" + ((60 + (m)) % 60))).get(0)
+                == null) {
+                m--;
+            }
+        }
+        return m;
     }
 }
