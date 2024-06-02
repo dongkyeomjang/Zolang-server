@@ -1,11 +1,14 @@
 package com.kcs.zolang.service;
 
+import com.kcs.zolang.domain.Bill;
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.Usage;
 import com.kcs.zolang.domain.User;
+import com.kcs.zolang.dto.response.cluster.UserUsageBillDto;
 import com.kcs.zolang.dto.response.cluster.UserUsageDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
+import com.kcs.zolang.repository.BillRepository;
 import com.kcs.zolang.repository.ClusterRepository;
 import com.kcs.zolang.repository.UsageRepository;
 import com.kcs.zolang.repository.UserRepository;
@@ -24,12 +27,15 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.time.temporal.ChronoUnit;
+import java.util.ArrayList;
 import java.util.List;
-import java.util.OptionalDouble;
 import java.util.stream.Collectors;
+
 
 @Service
 @RequiredArgsConstructor
@@ -40,6 +46,7 @@ public class UserUsageService {
     private final MonitoringUtil monitoringUtil;
     private final UsageRepository usageRepository;
     private final UserRepository userRepository;
+    private final BillRepository billRepository;
 
     //모든 클러스터 총 합(실시간)
     public UserUsageDto getUserUsage(Long userId) throws Exception {
@@ -139,15 +146,86 @@ public class UserUsageService {
         }
     }
 
+    //5일전 데이터 삭제
     @Transactional
     @Scheduled(cron = "0 0 0 * * *") // 정각마다 5일전 데이터 삭제
     public void deleteOldUsages() {
-        LocalDateTime thresholdDate = LocalDateTime.now().minusSeconds(10);
+        LocalDateTime thresholdDate = LocalDateTime.now().minusDays(5);
+        LocalDate thresholdLocalDate = thresholdDate.toLocalDate();
+        String thresholdDateString = thresholdLocalDate.toString();
+
+        // Usage 데이터 삭제
         usageRepository.deleteByCreatedAtBefore(thresholdDate);
-        log.info("Old usage data deleted up to: " + thresholdDate);
+        log.info("usage 데이터 삭제 완:" + thresholdDate);
+
+        // Bill 데이터 삭제
+        List<Bill> oldBills = billRepository.findAllByDateBefore(thresholdDateString);
+        for (Bill bill : oldBills) {
+            billRepository.delete(bill);
+            log.info("bill 데이터 삭제 완: " + bill.getDate());
+        }
     }
 
-    //1일전 데이터 내보내기
+    //정각마다 하루 전 cost 저장
+    @Transactional
+    @Scheduled(cron = "0 0 0 * * *")
+    public void saveDailyBill() {
+        LocalDateTime now = LocalDateTime.now();
+        LocalDateTime startOfDay = now.minusDays(1).truncatedTo(ChronoUnit.DAYS);
+        LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
+
+        List<User> users = userRepository.findAll();
+
+        for (User user : users) {
+            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(user.getId(), startOfDay, endOfDay);
+
+            double totalCpuUsage = usages.stream().mapToDouble(Usage::getCpuUsage).sum();
+            double totalCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).sum();
+            double totalMemoryUsage = usages.stream().mapToLong(Usage::getMemoryUsage).sum();
+            double totalMemoryCapacity = usages.stream().mapToLong(Usage::getMemoryCapacity).sum();
+            double totalPodUsage = usages.stream().mapToInt(Usage::getPodUsage).sum();
+            double totalPodCapacity = usages.stream().mapToInt(Usage::getPodCapacity).sum();
+
+            double cpuCost = (totalCpuUsage / totalCpuCapacity) * 15000;
+            double memoryCost = (totalMemoryUsage / totalMemoryCapacity) * 15000;
+            double podCost = (totalPodUsage / totalPodCapacity) * 15000;
+
+            // Calculate runtime cost
+            double runtimeCost = 0;
+            List<Cluster> clusters = clusterRepository.findByUserId(user.getId());
+            for (Cluster cluster : clusters) {
+                LocalDateTime clusterCreatedAt = cluster.getCreatedAt();
+                long runtimeMinutes;
+
+                if (clusterCreatedAt.isBefore(startOfDay)) {
+                    // 클러스터 생성일이 하루 시작 전인 경우
+                    runtimeMinutes = 1440; // 하루 1440분
+                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(endOfDay)) {
+                    // 클러스터 생성일이 하루 중인 경우
+                    runtimeMinutes = Duration.between(clusterCreatedAt, endOfDay).toMinutes();
+                } else {
+                    // 클러스터 생성일이 하루 끝난 후인 경우
+                    runtimeMinutes = 0;
+                }
+
+                runtimeCost += runtimeMinutes * 150;
+            }
+
+            Bill bill = Bill.builder()
+                    .user(user)
+                    .cpuCost(cpuCost)
+                    .memoryCost(memoryCost)
+                    .podCost(podCost)
+                    .runtimeCost(runtimeCost)
+                    .date(String.valueOf(LocalDate.now().minusDays(1)))
+                    .build();
+
+            billRepository.save(bill);
+            log.info("하루치 bill 저장 완: " + user.getId());
+        }
+    }
+
+    //1일전 데이터 뽑기 (그래프용)
     public UserUsageDto getUserUsageAverage(Long userId) {
         LocalDate date = LocalDate.now();
         LocalDateTime startOfDay = date.minusDays(1).atStartOfDay();
@@ -156,9 +234,9 @@ public class UserUsageService {
         List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay, endOfDay);
 
 
-//        if (usages.isEmpty()) {
-//            throw new CommonException(ErrorCode.NOT_FOUND_USAGE);
-//        }
+        if (usages.isEmpty()) {
+            throw new CommonException(ErrorCode.NOT_FOUND_USAGE);
+        }
 
         double avgCpuUsage = usages.stream().mapToDouble(Usage::getCpuUsage).average().orElse(0);
         double avgCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).average().orElse(0);
@@ -182,4 +260,116 @@ public class UserUsageService {
                 (int) avgPodCapacity
         );
     }
+
+
+    //4일치 데이터 + 실시간 데이터 뽑기(Bill지 용)
+    public List<UserUsageBillDto> getUserUsageBill(Long userId) {
+        LocalDateTime now = LocalDateTime.now();
+        List<UserUsageBillDto> usageBills = new ArrayList<>();
+
+        for (int i = 1; i <= 4; i++) {
+            LocalDateTime endOfDay = now.minusDays(i).truncatedTo(ChronoUnit.DAYS).plusDays(1).minusNanos(1);
+            LocalDateTime startOfDay = now.minusDays(i).truncatedTo(ChronoUnit.DAYS);
+
+            double totalCpuUsage = 0;
+            long totalMemoryUsage = 0;
+            int totalPodUsage = 0;
+            long totalClusterRuntime = 0;
+
+            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay, endOfDay);
+
+            for (Usage usage : usages) {
+                totalCpuUsage += usage.getCpuUsage();
+                totalMemoryUsage += usage.getMemoryUsage();
+                totalPodUsage += usage.getPodUsage();
+            }
+
+            List<Cluster> clusters = clusterRepository.findByUserId(userId);
+            for (Cluster cluster : clusters) {
+                LocalDateTime clusterCreatedAt = cluster.getCreatedAt();
+
+                if (clusterCreatedAt.isBefore(startOfDay)) {
+                    totalClusterRuntime += 1440; // 하루 1440분
+                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(endOfDay)) {
+                    totalClusterRuntime += Duration.between(clusterCreatedAt, endOfDay).toMinutes();
+                } else if (clusterCreatedAt.isEqual(startOfDay)) {
+                    totalClusterRuntime += Duration.between(clusterCreatedAt, endOfDay).toMinutes();
+                }
+
+            }
+
+            Bill bill = billRepository.findByUserIdAndDate(userId, startOfDay.toLocalDate().toString());
+
+            UserUsageBillDto usageBill = UserUsageBillDto.builder()
+                    .date(startOfDay.toLocalDate().toString())
+                    .totalCpuUsage(totalCpuUsage)
+                    .totalCpuCost(bill != null ? bill.getCpuCost() : 0)
+                    .totalMemoryUsage(totalMemoryUsage)
+                    .totalMemoryCost(bill != null ? bill.getMemoryCost() : 0)
+                    .totalPodUsage(totalPodUsage)
+                    .totalPodCost(bill != null ? bill.getPodCost() : 0)
+                    .totalClusterRuntime(totalClusterRuntime)
+                    .totalClusterRuntimeCost(totalClusterRuntime*150)
+                    .totalCost(bill != null ? bill.getCpuCost() + bill.getMemoryCost() + bill.getPodCost() + (totalClusterRuntime * 150) : 0)
+                    .build();
+
+            usageBills.add(usageBill);
+        }
+
+        return usageBills;
+    }
+
+    public List<UserUsageBillDto> getRealTimeBill(Long userId) throws Exception {
+        List<UserUsageBillDto> usageBills = getUserUsageBill(userId);
+
+        // 실시간 데이터
+        UserUsageDto realTimeUsage = getUserUsage(userId);
+
+        //분모 0일 경우 제외
+        double cpuCapacity = realTimeUsage.cpuCapacity() != 0 ? realTimeUsage.cpuCapacity() : 1;
+        double memoryCapacity = realTimeUsage.memoryCapacity() != 0 ? realTimeUsage.memoryCapacity() : 1;
+        double podCapacity = realTimeUsage.podCapacity() != 0 ? realTimeUsage.podCapacity() : 1;
+
+        double realTimeCpuCost = (realTimeUsage.cpuUsage() / cpuCapacity) * 15000;
+        double realTimeMemoryCost = (realTimeUsage.memoryUsage() / memoryCapacity) * 15000;
+        double realTimePodCost = (realTimeUsage.podUsage() / podCapacity) * 15000;
+
+        // 클러스터 런타임 계산
+        long totalClusterRuntime = 0;
+        LocalDateTime now = LocalDateTime.now();
+        List<Cluster> clusters = clusterRepository.findByUserId(userId);
+        for (Cluster cluster : clusters) {
+            LocalDateTime clusterCreatedAt = cluster.getCreatedAt();
+
+            if (clusterCreatedAt.toLocalDate().isBefore(now.toLocalDate())) {
+                totalClusterRuntime += Duration.between(now.toLocalDate().atStartOfDay(), now).toMinutes(); // 오늘 정각부터 현재 시간까지
+            } else {
+                totalClusterRuntime += Duration.between(clusterCreatedAt, now).toMinutes(); // 생성 시간부터 현재 시간까지
+            }
+        }
+
+        double realTimeRuntimeCost = totalClusterRuntime * 150;
+
+        double realTimeTotalCost = realTimeCpuCost + realTimeMemoryCost + realTimePodCost + realTimeRuntimeCost;
+
+
+        UserUsageBillDto realTimeBill = UserUsageBillDto.builder()
+                .date(LocalDate.now().toString())
+                .totalCpuUsage(realTimeUsage.cpuUsage())
+                .totalCpuCost(realTimeCpuCost)
+                .totalMemoryUsage(realTimeUsage.memoryUsage())
+                .totalMemoryCost(realTimeMemoryCost)
+                .totalPodUsage(realTimeUsage.podUsage())
+                .totalPodCost(realTimePodCost)
+                .totalClusterRuntime(totalClusterRuntime)
+                .totalClusterRuntimeCost(realTimeRuntimeCost)
+                .totalCost(realTimeTotalCost)
+                .build();
+
+        usageBills.add(0, realTimeBill); // 실시간 데이터 맨 앞으로
+
+        return usageBills;
+    }
+
+
 }
