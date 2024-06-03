@@ -125,29 +125,29 @@ public class CICDService {
     }
 
     public void handleGithubWebhook(Map<String, Object> payload, String eventType) {
-        Optional<Build> lastBuildOptional = buildRepository.findTopByCICDOrderByCreatedAtDesc(cicdRepository.findByRepositoryName(payload.get("repository").toString())
-                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY)));
-        if (lastBuildOptional.isPresent()) {
-            Build lastBuild = lastBuildOptional.get();
-            long timeDifferenceInSeconds = Duration.between(lastBuild.getCreatedAt(), LocalDateTime.now()).getSeconds();
-            if (timeDifferenceInSeconds < 2) {
-                return;
+        ObjectMapper objectMapper = new ObjectMapper();
+        JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
+        try{
+            JsonNode repositoryNode = rootNode.path("repository");
+            String repoName = repositoryNode.path("name").asText();
+            Optional<Build> lastBuildOptional = buildRepository.findTopByCICDOrderByCreatedAtDesc(cicdRepository.findByRepositoryName(repoName)
+                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY)));
+            if (lastBuildOptional.isPresent()) {
+                Build lastBuild = lastBuildOptional.get();
+                long timeDifferenceInSeconds = Duration.between(lastBuild.getCreatedAt(), LocalDateTime.now()).getSeconds();
+                if (timeDifferenceInSeconds < 2) {
+                    return;
+                }
             }
-        }
-        try {
-            ObjectMapper objectMapper = new ObjectMapper();
-            JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
 
             if (!"push".equals(eventType) && !"pull_request".equals(eventType)) {
                 log.info("Ignoring event: {}", eventType);
                 return;
             }
 
-            JsonNode repositoryNode = rootNode.path("repository");
             if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
-            String repoName = repositoryNode.path("name").asText();
 
             String branch;
             String lastCommitMessage;

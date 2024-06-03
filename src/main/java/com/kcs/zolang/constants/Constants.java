@@ -31,6 +31,5 @@ public class Constants {
             "/swagger-ui/**",
 
             "/api/v1/webhook",
-            "/api/v1/user/dashboard/usage"
             );
 }
