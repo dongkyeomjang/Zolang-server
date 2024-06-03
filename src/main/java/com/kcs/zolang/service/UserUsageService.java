@@ -348,7 +348,7 @@ public class UserUsageService {
             }
         }
 
-        double realTimeRuntimeCost = totalClusterRuntime * 150;
+        double realTimeRuntimeCost = totalClusterRuntime * 80;
 
         double realTimeTotalCost = realTimeCpuCost + realTimeMemoryCost + realTimePodCost + realTimeRuntimeCost;
 
