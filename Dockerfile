@@ -1,13 +1,13 @@
-FROM --platform=$BUILDPLATFORM eclipse-temurin:17-jdk-alpine AS build
+FROM openjdk:17-alpine
 
 WORKDIR /app
 
 # glibc 설치
 RUN wget -q -O /etc/apk/keys/sgerrand.rsa.pub https://alpine-pkgs.sgerrand.com/sgerrand.rsa.pub && \
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.31-r0/glibc-2.31-r0.apk && \
-    apk add --no-cache --force-overwrite glibc-2.31-r0.apk && \
+    apk add --no-cache glibc-2.31-r0.apk && \
     wget https://github.com/sgerrand/alpine-pkg-glibc/releases/download/2.31-r0/glibc-bin-2.31-r0.apk && \
-    apk add --no-cache --force-overwrite glibc-bin-2.31-r0.apk && \
+    apk add --no-cache glibc-bin-2.31-r0.apk && \
     /usr/glibc-compat/sbin/ldconfig /lib /usr/glibc-compat/lib
 
 # 필수 라이브러리 설치
