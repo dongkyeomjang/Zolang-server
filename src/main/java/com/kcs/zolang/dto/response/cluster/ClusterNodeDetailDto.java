@@ -5,6 +5,9 @@ import io.kubernetes.client.openapi.models.V1NodeCondition;
 import io.swagger.v3.oas.annotations.media.Schema;
 import lombok.Builder;
 
+import java.time.OffsetDateTime;
+import java.time.ZoneId;
+import java.time.format.DateTimeFormatter;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -38,6 +41,9 @@ public record ClusterNodeDetailDto(
         Map<String, String> capacity
 ) {
     public static ClusterNodeDetailDto fromEntity(V1Node node) {
+        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss").withZone(ZoneId.systemDefault());
+        OffsetDateTime creationTimestamp = node.getMetadata().getCreationTimestamp();
+
         return ClusterNodeDetailDto.builder()
                 .allocatable(node.getStatus().getAllocatable().entrySet().stream()
                         .collect(Collectors.toMap(Map.Entry::getKey, entry -> entry.getValue().getNumber().toString())))
@@ -47,7 +53,7 @@ public record ClusterNodeDetailDto(
                 .kubectlVersion(node.getStatus().getNodeInfo().getKubeletVersion())
                 .os(node.getStatus().getNodeInfo().getOperatingSystem())
                 .containerRuntime(node.getStatus().getNodeInfo().getContainerRuntimeVersion())
-                .created(node.getMetadata().getCreationTimestamp().toString())
+                .created(creationTimestamp != null ? formatter.format(creationTimestamp) : "N/A")
                 .kernelVersion(node.getStatus().getNodeInfo().getKernelVersion())
                 .name(node.getMetadata().getName())
                 .conditions(node.getStatus().getConditions().stream().map(NodeConditionDto::fromEntity).collect(Collectors.toList()))
