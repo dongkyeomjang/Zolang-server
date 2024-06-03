@@ -19,7 +19,14 @@ public enum ErrorCode {
     NOT_FOUND_CLUSTER(40402, HttpStatus.NOT_FOUND, "해당 클러스터가 존재하지 않습니다."),
     NOT_FOUND_REPOSITORY(40403, HttpStatus.NOT_FOUND, "해당 저장소가 존재하지 않습니다."),
     NOT_FOUND_CONDITION(40404, HttpStatus.NOT_FOUND, "해당 조건에 맞는 데이터가 존재하지 않습니다."),
-    NOT_FOUND_NETWORK(40405, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
+    NOT_FOUND_POD(40405, HttpStatus.NOT_FOUND, "해당 파드가 존재하지 않습니다."),
+    NOT_FOUND_NETWORK(40406, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
+    NOT_FOUND_DEPLOYMENT(40407, HttpStatus.NOT_FOUND, "해당 디플로이먼트가 존재하지 않습니다."),
+    NOT_FOUND_DEMON_SET(40408, HttpStatus.NOT_FOUND, "해당 데몬셋이 존재하지 않습니다."),
+    NOT_FOUND_STATEFUL_SET(40409, HttpStatus.NOT_FOUND, "해당 스테이트풀셋이 존재하지 않습니다."),
+    NOT_FOUND_REPLICA_SET(40410, HttpStatus.NOT_FOUND, "해당 레플리카셋이 존재하지 않습니다."),
+    NOT_FOUND_USAGE(40411, HttpStatus.NOT_FOUND, "해당 클러스터에 사용이 존재하지 않습니다."),
+    NOT_FOUND_NETWORK(40412, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
 
     // Invalid Argument Error
     MISSING_REQUEST_PARAMETER(40000, HttpStatus.BAD_REQUEST, "필수 요청 파라미터가 누락되었습니다."),
