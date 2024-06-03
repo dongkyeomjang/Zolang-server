@@ -188,11 +188,7 @@ public class ClusterUtil {
             String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
             String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
 
-            if (!isFirstRun) {
-                executeCommand(String.format("cd %s && git pull", repoDir));
-            } else {
-                executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
-            }
+            executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
 
             BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicd.getBuildTool());
             String setupCommand = buildTool.setup(repoDir);
@@ -218,6 +214,7 @@ public class ClusterUtil {
             } else {
                 rolloutDeployment(cicd, cluster, environmentVariables);
             }
+            executeCommand(String.format("rm -rf %s", repoDir));
             return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
             throw new CommonException(ErrorCode.PIPELINE_ERROR);

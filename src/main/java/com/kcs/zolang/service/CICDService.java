@@ -170,6 +170,7 @@ public class CICDService {
             buildRepository.save(build);
             try {
                 List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                log.info("Environment variables: {}", environmentVariables);
                 clusterUtil.runPipeline(cicd, environmentVariables, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
