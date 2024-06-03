@@ -185,7 +185,7 @@ public class ClusterUtil {
         }
     }
 
-    @Async
+    @Async("taskExecutor")
     public CompletableFuture<Void> runPipeline(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables, Cluster cluster, UserCICDDto userCICDDto, Boolean isFirstRun) {
         try {
             String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
