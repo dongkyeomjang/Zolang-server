@@ -18,7 +18,7 @@ import java.util.Map;
 public class WebhookController {
     private final CICDService cicdService;
 
-    @PostMapping("/api/v1/webhook")
+    @PostMapping("")
     public ResponseDto<?> handleGithubWebhook(@RequestBody Map<String, Object> payload, @RequestHeader("X-GitHub-Event") String eventType) {
         log.info("Received webhook event: " + eventType);
         switch (eventType) {
@@ -26,6 +26,8 @@ public class WebhookController {
                 return handlePushEvent(payload, eventType);
             case "pull_request":
                 return handlePullRequestEvent(payload, eventType);
+            case "ping":
+                return ResponseDto.ok(null);
             default:
                 return ResponseDto.fail(new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK));
         }
