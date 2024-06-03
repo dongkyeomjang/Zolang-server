@@ -37,6 +37,7 @@ public class CICDService {
     private final CICDRepository cicdRepository;
     private final BuildRepository buildRepository;
     private final UserRepository userRepository;
+    private final WebhookEventRepository webhookEventRepository;
     private final ClusterRepository clusterRepository;
     private final EnvVarRepository envVarRepository;
     private final RestTemplate restTemplate;
@@ -124,30 +125,36 @@ public class CICDService {
         }
     }
 
-    public void handleGithubWebhook(Map<String, Object> payload, String eventType) {
-        ObjectMapper objectMapper = new ObjectMapper();
-        JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
-        try{
-            JsonNode repositoryNode = rootNode.path("repository");
-            String repoName = repositoryNode.path("name").asText();
-            Optional<Build> lastBuildOptional = buildRepository.findTopByCICDOrderByCreatedAtDesc(cicdRepository.findByRepositoryName(repoName)
-                    .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY)));
-            if (lastBuildOptional.isPresent()) {
-                Build lastBuild = lastBuildOptional.get();
-                long timeDifferenceInSeconds = Duration.between(lastBuild.getCreatedAt(), LocalDateTime.now()).getSeconds();
-                if (timeDifferenceInSeconds < 2) {
-                    return;
-                }
+    public void handleGithubWebhook(Map<String, Object> payload, String eventType, String eventId) {
+        try {
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
+
+            if (eventId == null || eventId.isEmpty()) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
+
+            if (webhookEventRepository.findByEventId(eventId).isPresent()) {
+                log.info("Duplicate event received: {}", eventId);
+                return;
+            }
+
+            // Save the new event ID
+            WebhookEvent webhookEvent = WebhookEvent.builder()
+                            .eventId(eventId)
+                            .receivedAt(LocalDateTime.now())
+                            .build();
+            webhookEventRepository.save(webhookEvent);
 
             if (!"push".equals(eventType) && !"pull_request".equals(eventType)) {
                 log.info("Ignoring event: {}", eventType);
                 return;
             }
-
+            JsonNode repositoryNode = rootNode.path("repository");
             if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
+            String repoName = repositoryNode.path("name").asText();
 
             String branch;
             String lastCommitMessage;
