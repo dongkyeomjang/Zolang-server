@@ -139,6 +139,7 @@ public class CICDService {
             } else if (rootNode.has("pull_request")) {
                 eventType = "pull_request";
             } else {
+                log.info("payload: {}",payload);
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
 
