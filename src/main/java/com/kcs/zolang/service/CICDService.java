@@ -150,14 +150,17 @@ public class CICDService {
 
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+            log.info("Found CICD: {}", cicd);
             if (!cicd.getBranch().equals(branch)) {
                 log.info("Ignoring webhook event for branch: {}", branch);
                 return;
             }
 
             Long userId = cicd.getUser().getId();
+            log.info("User ID: {}", userId);
             Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            log.info("Found cluster: {}", clusterProvidedByZolang);
             Build build = Build.builder()
                     .CICD(cicd)
                     .lastCommitMessage(lastCommitMessage)
@@ -176,6 +179,7 @@ public class CICDService {
                 throw new CommonException(ErrorCode.PIPELINE_ERROR);
             }
         } catch (Exception e) {
+            log.error("Failed to process webhook event: {}", e.getMessage());
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
     }
