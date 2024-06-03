@@ -11,6 +11,7 @@ public record CICDDto(
         String repositoryName,
         String lastCommit,
         String lastBuildStatus,
+        String buildTool,
         LocalDateTime createdAt
 ) {
     public static CICDDto fromEntity(CICD cicd, Build lastBuild) {
@@ -19,6 +20,7 @@ public record CICDDto(
                 .repositoryName(cicd.getRepositoryName())
                 .lastCommit(lastBuild.getLastCommitMessage())
                 .lastBuildStatus(lastBuild.getBuildStatus())
+                .buildTool(cicd.getBuildTool())
                 .createdAt(cicd.getCreatedAt())
                 .build();
     }

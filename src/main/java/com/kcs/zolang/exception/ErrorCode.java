@@ -25,8 +25,9 @@ public enum ErrorCode {
     NOT_FOUND_DEMON_SET(40408, HttpStatus.NOT_FOUND, "해당 데몬셋이 존재하지 않습니다."),
     NOT_FOUND_STATEFUL_SET(40409, HttpStatus.NOT_FOUND, "해당 스테이트풀셋이 존재하지 않습니다."),
     NOT_FOUND_REPLICA_SET(40410, HttpStatus.NOT_FOUND, "해당 레플리카셋이 존재하지 않습니다."),
-    NOT_FOUND_USAGE(40411, HttpStatus.NOT_FOUND, "해당 클러스터에 사용이 존재하지 않습니다."),
+    NOT_FOUND_BUILD(40411, HttpStatus.NOT_FOUND, "해당 빌드 기록이 존재하지 않습니다."),
     NOT_FOUND_NETWORK(40412, HttpStatus.NOT_FOUND, "해당 네트워크(서비스)가 존재하지 않습니다."),
+    NOT_FOUND_USAGE(40413, HttpStatus.NOT_FOUND, "해당 클러스터에 사용이 존재하지 않습니다."),
 
     // Invalid Argument Error
     MISSING_REQUEST_PARAMETER(40000, HttpStatus.BAD_REQUEST, "필수 요청 파라미터가 누락되었습니다."),
@@ -37,6 +38,7 @@ public enum ErrorCode {
     BAD_REQUEST_PARAMETER(40005, HttpStatus.BAD_REQUEST, "잘못된 요청 파라미터입니다."),
     BAD_REQUEST_JSON(40006, HttpStatus.BAD_REQUEST, "잘못된 JSON 형식입니다."),
     SEARCH_SHORT_LENGTH_ERROR(40007, HttpStatus.BAD_REQUEST, "검색어는 2글자 이상이어야 합니다."),
+    INVALID_PAYLOAD(40008, HttpStatus.BAD_REQUEST, "유효하지 않은 페이로드입니다."),
 
 
     // Access Denied Error
@@ -66,7 +68,11 @@ public enum ErrorCode {
     FAILED_CREATE_WEBHOOK(50005, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 생성에 실패하였습니다."),
     PIPELINE_ERROR(50006, HttpStatus.INTERNAL_SERVER_ERROR, "파이프라인 실행에 실패하였습니다."),
     GRADLE_FILE_ERROR(50007, HttpStatus.INTERNAL_SERVER_ERROR, "그레이들 빌드에 실패하였습니다."),
-    FAILED_PROCESS_WEBHOOK(50008, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 처리에 실패하였습니다.");
+    FAILED_PROCESS_WEBHOOK(50008, HttpStatus.INTERNAL_SERVER_ERROR, "Webhook 처리에 실패하였습니다."),
+
+    // 개발자가 직접 정의한 에러
+    ALREADY_EXIST_ZOLANG_CLUSTER(60000, HttpStatus.BAD_REQUEST, "Zolang에서 생성할 수 있는 클러스터는 최대 1개입니다.");
+
 
     private final Integer code;
     private final HttpStatus httpStatus;

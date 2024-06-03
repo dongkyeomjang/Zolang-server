@@ -2,8 +2,10 @@ package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
 import com.kcs.zolang.domain.CICD;
-import com.kcs.zolang.domain.EnvVar;
-import com.kcs.zolang.dto.request.EnvVarDto;
+import com.kcs.zolang.domain.EnvironmentVariable;
+import com.kcs.zolang.domain.User;
+import com.kcs.zolang.dto.response.CICDDto;
+import com.kcs.zolang.dto.response.UserCICDDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.BuildTool.*;
@@ -119,10 +121,10 @@ public class ClusterUtil {
                     "  name: %s\n" +
                     "rules:\n" +
                     "- apiGroups: [\"\"]\n" +
-                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\", \"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
                     "- apiGroups: [\"metrics.k8s.io\"]\n" +
-                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\"]\n" +
+                    "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\",\"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
                     "EOF", roleName);
             log.info("Executing command: {}", roleCommand);
@@ -163,20 +165,20 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-    public void rolloutDeployment(CICD cicd, Cluster cluster, List<EnvVar> envVars) {
+    public void rolloutDeployment(CICDDto cicdDto, Cluster cluster, List<EnvironmentVariable> environmentVariables) {
         try {
             ApiClient client = buildApiClient(generateKubeConfig(cluster));
             Configuration.setDefaultApiClient(client);
             AppsV1Api api = new AppsV1Api();
 
             // Deployment 삭제
-            api.deleteNamespacedDeployment(cicd.getRepositoryName(), "default");
-            log.info("Deleted existing deployment: {}", cicd.getRepositoryName());
+            api.deleteNamespacedDeployment(cicdDto.repositoryName(), "default");
+            log.info("Deleted existing deployment: {}", cicdDto.repositoryName());
 
             // 새로운 Deployment 생성
-            String deploymentYaml = generateDeploymentYaml(cicd, envVars);
+            String deploymentYaml = generateDeploymentYaml(cicdDto, environmentVariables);
             applyYamlToCluster(deploymentYaml, cluster);
-            log.info("Applied new deployment: {}", cicd.getRepositoryName());
+            log.info("Applied new deployment: {}", cicdDto.repositoryName());
 
         } catch (IOException e) {
             throw new CommonException(ErrorCode.PIPELINE_ERROR);
@@ -184,18 +186,14 @@ public class ClusterUtil {
     }
 
     @Async
-    public CompletableFuture<Void> runPipeline(CICD cicd, List<EnvVar> envVars, Cluster cluster, Boolean isFirstRun) {
+    public CompletableFuture<Void> runPipeline(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables, Cluster cluster, UserCICDDto userCICDDto, Boolean isFirstRun) {
         try {
-            String repoUrl = String.format("https://github.com/%s/%s.git", cicd.getUser().getNickname(), cicd.getRepositoryName());
-            String repoDir = "/app/resources/repo/" + cicd.getRepositoryName();
+            String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
+            String repoDir = "/app/resources/repo/" + cicdDto.repositoryName();
 
-            if (!isFirstRun) {
-                executeCommand(String.format("cd %s && git pull", repoDir));
-            } else {
-                executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
-            }
+            executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
 
-            BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicd.getBuildTool());
+            BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicdDto.buildTool());
             String setupCommand = buildTool.setup(repoDir);
             if (setupCommand != null) {
                 executeCommand(setupCommand);
@@ -206,7 +204,7 @@ public class ClusterUtil {
                     awsRegion, awsAccountId, awsRegion);
             executeCommand(ecrLoginCommand);
 
-            String ecrRepoName = cicd.getRepositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
+            String ecrRepoName = cicdDto.repositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
 
             String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
                     awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
@@ -214,30 +212,34 @@ public class ClusterUtil {
             executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
             executeCommand(String.format("docker push %s", imageName));
 
+
             if (isFirstRun) {
-                applyYamlToCluster(generateDeploymentYaml(cicd,envVars), cluster);
+                applyYamlToCluster(generateDeploymentYaml(cicdDto, environmentVariables), cluster);
             } else {
-                rolloutDeployment(cicd, cluster, envVars);
+                rolloutDeployment(cicdDto, cluster, environmentVariables);
             }
+            executeCommand(String.format("rm -rf %s", repoDir));
             return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
+            log.error("Exception occurred while running pipeline", e);
             throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }
     }
 
-    private String generateDeploymentYaml(CICD cicd, List<EnvVar> envVars) {
+    private String generateDeploymentYaml(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables) {
         StringBuilder envVarsBuilder = new StringBuilder();
-        if(envVars != null){
-            for (EnvVar envVar : envVars) {
+        if (environmentVariables != null && !environmentVariables.isEmpty()) {
+            envVarsBuilder.append("        env:\n");
+            for (EnvironmentVariable environmentVariable : environmentVariables) {
                 envVarsBuilder.append(String.format(
                         "        - name: %s\n" +
-                                "          value: %s\n", envVar.getKey(), envVar.getValue()));
+                                "          value: %s\n", environmentVariable.getKey(), environmentVariable.getValue()));
             }
         }
 
-        String deploymentName = cicd.getRepositoryName();
+        String deploymentName = cicdDto.repositoryName();
         String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
-                awsAccountId, awsRegion, ecrRepositoryPrefix, cicd.getRepositoryName());
+                awsAccountId, awsRegion, ecrRepositoryPrefix, cicdDto.repositoryName());
         return String.format(
                 "apiVersion: apps/v1\n" +
                         "kind: Deployment\n" +

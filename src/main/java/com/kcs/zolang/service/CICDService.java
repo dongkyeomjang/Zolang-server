@@ -1,10 +1,13 @@
 package com.kcs.zolang.service;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.kcs.zolang.domain.*;
 import com.kcs.zolang.dto.request.CICDRequestDto;
 import com.kcs.zolang.dto.request.EnvVarDto;
 import com.kcs.zolang.dto.response.BuildDto;
 import com.kcs.zolang.dto.response.CICDDto;
+import com.kcs.zolang.dto.response.UserCICDDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.*;
@@ -20,10 +23,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
-import java.util.Arrays;
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -31,6 +37,7 @@ public class CICDService {
     private final CICDRepository cicdRepository;
     private final BuildRepository buildRepository;
     private final UserRepository userRepository;
+    private final WebhookEventRepository webhookEventRepository;
     private final ClusterRepository clusterRepository;
     private final EnvVarRepository envVarRepository;
     private final RestTemplate restTemplate;
@@ -86,12 +93,12 @@ public class CICDService {
                     .build();
             cicdRepository.save(cicd);
             for (EnvVarDto envVarDto : requestDto.envVars()){
-                EnvVar envVar = EnvVar.builder()
+                EnvironmentVariable environmentVariable = EnvironmentVariable.builder()
                         .key(envVarDto.key())
                         .value(envVarDto.value())
                         .CICD(cicd)
                         .build();
-                envVarRepository.save(envVar);
+                envVarRepository.save(environmentVariable);
             }
             Build build = Build.builder()
                             .CICD(cicd)
@@ -102,8 +109,10 @@ public class CICDService {
             buildRepository.save(build);
 
             try {
-                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
-                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
+                List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                UserCICDDto userCICDDto = UserCICDDto.fromEntity(user);
+                CICDDto cicdDto = CICDDto.fromEntity(cicd,Build.builder().build());
+                clusterUtil.runPipeline(cicdDto, environmentVariables, clusterProvidedByZolang, userCICDDto, true).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
@@ -116,43 +125,93 @@ public class CICDService {
         }
     }
 
-    public void handleGithubWebhook(Map<String, Object> payload) {
+    public void handleGithubWebhook(Map<String, Object> payload, String eventType, String eventId) {
         try {
-            String repoName = (String) ((Map<String, Object>) payload.get("repository")).get("name");
-            String ref = (String) payload.get("ref");
-            String branch = ref.substring(ref.lastIndexOf("/") + 1);
+            ObjectMapper objectMapper = new ObjectMapper();
+            JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
+
+            if (eventId == null || eventId.isEmpty()) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+
+            if (webhookEventRepository.findByEventId(eventId).isPresent()) {
+                log.info("Duplicate event received: {}", eventId);
+                return;
+            }
+
+            // Save the new event ID
+            WebhookEvent webhookEvent = WebhookEvent.builder()
+                            .eventId(eventId)
+                            .receivedAt(LocalDateTime.now())
+                            .build();
+            webhookEventRepository.save(webhookEvent);
+
+            if (!"push".equals(eventType) && !"pull_request".equals(eventType)) {
+                log.info("Ignoring event: {}", eventType);
+                return;
+            }
+            JsonNode repositoryNode = rootNode.path("repository");
+            if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
+                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+            }
+            String repoName = repositoryNode.path("name").asText();
+
+            String branch;
+            String lastCommitMessage;
+
+            if ("push".equals(eventType)) {
+                branch = rootNode.path("ref").asText().replace("refs/heads/", "");
+                lastCommitMessage = rootNode.path("head_commit").path("message").asText();
+            } else {
+                JsonNode pullRequestNode = rootNode.path("pull_request");
+                branch = pullRequestNode.path("head").path("ref").asText();
+                lastCommitMessage = pullRequestNode.path("head").path("sha").asText();
+            }
+
+            log.info("Branch name: {}", branch);
+            log.info("Last commit message: {}", lastCommitMessage);
+
             CICD cicd = cicdRepository.findByRepositoryName(repoName)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
-
+            log.info("Found CICD: {}", cicd);
             if (!cicd.getBranch().equals(branch)) {
                 log.info("Ignoring webhook event for branch: {}", branch);
                 return;
             }
 
             Long userId = cicd.getUser().getId();
+            UserCICDDto userCICDDto = UserCICDDto.fromEntity(cicd.getUser());
+
+            log.info("User ID: {}", userId);
             Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+            log.info("Found cluster: {}", clusterProvidedByZolang);
             Build build = Build.builder()
                     .CICD(cicd)
-                    .lastCommitMessage((String) ((Map<String, Object>) payload.get("head_commit")).get("message"))
-                    .buildNumber(buildRepository.findBuildNumberByCICD(cicd).orElse(0) + 1)
+                    .lastCommitMessage(lastCommitMessage)
+                    .buildNumber(buildRepository.findBuildNumberByCICD(cicd) + 1)
                     .buildStatus("building")
                     .build();
             buildRepository.save(build);
             try {
-                List<EnvVar> envVars = envVarRepository.findByCICDId(cicd.getId());
-                clusterUtil.runPipeline(cicd, envVars, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
+                List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                CICDDto cicdDto = CICDDto.fromEntity(cicd, build);
+                log.info("Environment variables: {}", environmentVariables);
+                clusterUtil.runPipeline(cicdDto, environmentVariables, clusterProvidedByZolang, userCICDDto, false).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
                 build.update("failed");
                 buildRepository.save(build);
+                log.error("Failed to process pipeline: {}", e.getMessage());
                 throw new CommonException(ErrorCode.PIPELINE_ERROR);
             }
         } catch (Exception e) {
+            log.error("Failed to process webhook event: {}", e.getMessage());
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
     }
+
     public List<CICDDto> getCICDs(Long userId) {
         List<CICD> cicdList = cicdRepository.findByUserId(userId);
         return cicdList.stream().map(cicd -> {
