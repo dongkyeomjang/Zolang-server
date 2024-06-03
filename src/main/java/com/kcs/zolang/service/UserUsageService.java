@@ -120,6 +120,7 @@ public class UserUsageService {
         );
     }
 
+    //usage 데이터 저장
     @Scheduled(cron = "0 0 * * * *") // 1시간마다 데이터 저장
     public void saveHourlyUserUsage() {
         List<User> users = userRepository.findAll();
@@ -231,36 +232,58 @@ public class UserUsageService {
         LocalDateTime startOfDay = date.minusDays(1).atStartOfDay();
         LocalDateTime endOfDay = date.minusDays(1).atTime(LocalTime.MAX);
 
+        // 전날의 데이터
         List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay, endOfDay);
 
-
         if (usages.isEmpty()) {
-            throw new CommonException(ErrorCode.NOT_FOUND_USAGE);
+            // 전날 데이터 없는 경우 0으로
+            log.info("No usages found for user: {}", userId);
+            return new UserUsageDto(
+                    0.0,
+                    0.0,
+                    0.0,
+                    0L,
+                    0L,
+                    0L,
+                    0,
+                    0,
+                    0
+            );
         }
 
+        //평균 계산
         double avgCpuUsage = usages.stream().mapToDouble(Usage::getCpuUsage).average().orElse(0);
         double avgCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).average().orElse(0);
         double avgCpuAllocatable = usages.stream().mapToDouble(Usage::getCpuAllo).average().orElse(0);
-        double avgMemoryUsage = usages.stream().mapToLong(Usage::getMemoryUsage).average().orElse(0);
-        double avgMemoryCapacity = usages.stream().mapToLong(Usage::getMemoryCapacity).average().orElse(0);
-        double avgMemoryAllocatable = usages.stream().mapToLong(Usage::getMemoryAllo).average().orElse(0);
-        double avgPodUsage = usages.stream().mapToInt(Usage::getPodUsage).average().orElse(0);
-        double avgPodCapacity = usages.stream().mapToInt(Usage::getPodCapacity).average().orElse(0);
-        double avgPodAllocatable = usages.stream().mapToInt(Usage::getPodAllo).average().orElse(0);
+        long avgMemoryUsage = (long) usages.stream().mapToLong(Usage::getMemoryUsage).average().orElse(0);
+        long avgMemoryCapacity = (long) usages.stream().mapToLong(Usage::getMemoryCapacity).average().orElse(0);
+        long avgMemoryAllocatable = (long) usages.stream().mapToLong(Usage::getMemoryAllo).average().orElse(0);
+        int avgPodUsage = (int) usages.stream().mapToInt(Usage::getPodUsage).average().orElse(0);
+        int avgPodCapacity = (int) usages.stream().mapToInt(Usage::getPodCapacity).average().orElse(0);
+        int avgPodAllocatable = (int) usages.stream().mapToInt(Usage::getPodAllo).average().orElse(0);
+
+        log.info("Avg CPU Usage: {}", avgCpuUsage);
+        log.info("Avg CPU Capacity: {}", avgCpuCapacity);
+        log.info("Avg CPU Allocatable: {}", avgCpuAllocatable);
+        log.info("Avg Memory Usage: {}", avgMemoryUsage);
+        log.info("Avg Memory Capacity: {}", avgMemoryCapacity);
+        log.info("Avg Memory Allocatable: {}", avgMemoryAllocatable);
+        log.info("Avg Pod Usage: {}", avgPodUsage);
+        log.info("Avg Pod Capacity: {}", avgPodCapacity);
+        log.info("Avg Pod Allocatable: {}", avgPodAllocatable);
 
         return new UserUsageDto(
                 avgCpuUsage,
                 avgCpuAllocatable,
                 avgCpuCapacity,
-                (long) avgMemoryUsage,
-                (long) avgMemoryAllocatable,
-                (long) avgMemoryCapacity,
-                (int) avgPodUsage,
-                (int) avgPodAllocatable,
-                (int) avgPodCapacity
+                avgMemoryUsage,
+                avgMemoryAllocatable,
+                avgMemoryCapacity,
+                avgPodUsage,
+                avgPodAllocatable,
+                avgPodCapacity
         );
     }
-
 
     //4일치 데이터 + 실시간 데이터 뽑기(Bill지 용)
     public List<UserUsageBillDto> getUserUsageBill(Long userId) {
