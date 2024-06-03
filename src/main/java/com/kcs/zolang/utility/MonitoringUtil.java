@@ -1,17 +1,13 @@
 package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
-import com.kcs.zolang.domain.Usage;
 import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.response.UserUrlTokenDto;
-import com.kcs.zolang.dto.response.cluster.UserUsageDto;
 import com.kcs.zolang.dto.response.workload.UsageDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.ClusterRepository;
-import com.kcs.zolang.repository.UsageRepository;
 import com.kcs.zolang.repository.UserRepository;
-import com.kcs.zolang.service.UserUsageService;
 import io.kubernetes.client.Metrics;
 import io.kubernetes.client.custom.PodMetrics;
 import io.kubernetes.client.openapi.ApiClient;
@@ -29,6 +25,7 @@ import java.time.temporal.ChronoUnit;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.concurrent.TimeUnit;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -102,7 +99,7 @@ public class MonitoringUtil {
     public ApiClient getV1Api(Long userId, Long clusterId) {
         Cluster clusters = clusterRepository.findById(clusterId)
             .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-        if (!clusters.getUser().getId().equals(userId)) {
+        if (!Objects.equals(clusters.getUser().getId(), userId)) {
             throw new CommonException(ErrorCode.NOT_FOUND_CLUSTER);
         }
         UserUrlTokenDto userUrlTokenDto = UserUrlTokenDto.fromEntity(clusters);
@@ -139,7 +136,7 @@ public class MonitoringUtil {
                 for (V1Pod pod : podList.getItems()) {
                     String name = pod.getMetadata().getName();
                     String namespace = pod.getMetadata().getNamespace();
-                    PodMetrics usage = null;
+                    PodMetrics usage;
                     try {
                         usage = metrics.getPodMetrics(pod.getMetadata().getNamespace()).getItems()
                             .get(0);
@@ -166,14 +163,14 @@ public class MonitoringUtil {
                         .set("cluster-usage:" + cluster.getId() + ":" + name + ":" + m,
                             podUsage);
                     redisTemplate.expire("cluster-usage:" + cluster.getId() + ":" + name + ":" + m,
-                        15, TimeUnit.MINUTES);
+                        30, TimeUnit.MINUTES);
                 }
                 UsageDto totalUsage = UsageDto.fromEntity(totalCpuUsage, totalMemoryUsage, time);
                 redisTemplate.opsForValue()
                     .set("cluster-usage:" + cluster.getId() + ":totalCpuUsage:" + m,
                         totalUsage);
                 redisTemplate.expire("cluster-usage:" + cluster.getId() + ":totalCpuUsage:" + m,
-                    15, TimeUnit.MINUTES);
+                    30, TimeUnit.MINUTES);
                 for (String namespace : namespaceCpuUsage.keySet()) {
                     UsageDto namespaceUsage = UsageDto.fromEntity(namespaceCpuUsage.get(namespace),
                         namespaceMemoryUsage.get(namespace), time);
@@ -181,7 +178,7 @@ public class MonitoringUtil {
                         .set("cluster-usage:" + cluster.getId() + ":" + namespace + ":" + m,
                             namespaceUsage);
                     redisTemplate.expire(
-                        "cluster-usage:" + cluster.getId() + ":" + namespace + ":" + m, 15,
+                        "cluster-usage:" + cluster.getId() + ":" + namespace + ":" + m, 30,
                         TimeUnit.MINUTES);
                 }
             }
