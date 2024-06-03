@@ -19,6 +19,7 @@ import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.ClientBuilder;
 import io.kubernetes.client.util.KubeConfig;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
@@ -30,6 +31,7 @@ import java.util.concurrent.*;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class ClusterUtil {
     @Value("${aws.account.id}")
     private String awsAccountId;
@@ -37,6 +39,7 @@ public class ClusterUtil {
     private String awsRegion;
     @Value("${aws.ecr.repository.prefix}")
     private String ecrRepositoryPrefix;
+    private final JobQueueUtility jobQueueUtility;
 
     private ApiClient buildApiClient(String kubeConfigContent) throws IOException {
         KubeConfig config = KubeConfig.loadKubeConfig(new StringReader(kubeConfigContent));
@@ -187,43 +190,48 @@ public class ClusterUtil {
 
     @Async("taskExecutor")
     public CompletableFuture<Void> runPipeline(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables, Cluster cluster, UserCICDDto userCICDDto, Boolean isFirstRun) {
-        try {
-            String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
-            String repoDir = "/app/resources/repo/" + cicdDto.repositoryName();
+        CompletableFuture<Void> future = new CompletableFuture<>();
 
-            executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
+        jobQueueUtility.addJob(userCICDDto.id(), () -> {
+            try {
+                String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
+                String repoDir = "/app/resources/repo/" + cicdDto.repositoryName();
 
-            BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicdDto.buildTool());
-            String setupCommand = buildTool.setup(repoDir);
-            if (setupCommand != null) {
-                executeCommand(setupCommand);
+                executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
+
+                BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicdDto.buildTool());
+                String setupCommand = buildTool.setup(repoDir);
+                if (setupCommand != null) {
+                    executeCommand(setupCommand);
+                }
+                executeCommand(buildTool.build(repoDir));
+
+                String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
+                        awsRegion, awsAccountId, awsRegion);
+                executeCommand(ecrLoginCommand);
+
+                String ecrRepoName = cicdDto.repositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
+
+                String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
+                        awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
+                createEcrRepositoryIfNotExists(String.format("%s-%s", ecrRepositoryPrefix, ecrRepoName));
+                executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
+                executeCommand(String.format("docker push %s", imageName));
+
+                if (isFirstRun) {
+                    applyYamlToCluster(generateDeploymentYaml(cicdDto, environmentVariables), cluster);
+                } else {
+                    rolloutDeployment(cicdDto, cluster, environmentVariables);
+                }
+                executeCommand(String.format("rm -rf %s", repoDir));
+                future.complete(null);
+            } catch (IOException | InterruptedException | ExecutionException e) {
+                log.error("Exception occurred while running pipeline", e);
+                future.completeExceptionally(new CommonException(ErrorCode.PIPELINE_ERROR));
             }
-            executeCommand(buildTool.build(repoDir));
+        });
 
-            String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
-                    awsRegion, awsAccountId, awsRegion);
-            executeCommand(ecrLoginCommand);
-
-            String ecrRepoName = cicdDto.repositoryName().toLowerCase().replaceAll("[^a-z0-9]", "");
-
-            String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
-                    awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
-            createEcrRepositoryIfNotExists(String.format("%s-%s", ecrRepositoryPrefix, ecrRepoName));
-            executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
-            executeCommand(String.format("docker push %s", imageName));
-
-
-            if (isFirstRun) {
-                applyYamlToCluster(generateDeploymentYaml(cicdDto, environmentVariables), cluster);
-            } else {
-                rolloutDeployment(cicdDto, cluster, environmentVariables);
-            }
-            executeCommand(String.format("rm -rf %s", repoDir));
-            return CompletableFuture.completedFuture(null);
-        } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while running pipeline", e);
-            throw new CommonException(ErrorCode.PIPELINE_ERROR);
-        }
+        return future;
     }
 
     private String generateDeploymentYaml(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables) {
