@@ -14,7 +14,7 @@ public class AsyncConfig {
         ThreadPoolTaskExecutor executor = new ThreadPoolTaskExecutor();
         executor.setCorePoolSize(1);
         executor.setMaxPoolSize(1);
-        executor.setQueueCapacity(500);
+        executor.setQueueCapacity(300);
         executor.setThreadNamePrefix("GithubWebhook-");
         executor.initialize();
         return executor;
