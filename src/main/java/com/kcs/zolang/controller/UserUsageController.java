@@ -32,4 +32,12 @@ public class UserUsageController {
     ) {
         return ResponseDto.ok(userUsageService.getUserUsageAverage(userId));
     }
+
+    @GetMapping("/dashboard/usage/bill")
+    @Operation(summary = "사용자 클러스터 사용량 청구 정보 조회", description = "사용자의 클러스터 사용량 청구 정보 조회")
+    public ResponseDto<?> getUserUsageBill(
+            @UserId Long userId
+    ) throws Exception {
+        return ResponseDto.ok(userUsageService.getRealTimeBill(userId));
+    }
 }
