@@ -1,4 +1,4 @@
-FROM openjdk:17-alpine
+FROM --platform=$BUILDPLATFORM eclipse-temurin:17-jdk-alpine AS build
 
 WORKDIR /app
 
@@ -39,6 +39,13 @@ RUN curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/s
 
 # Git 설치
 RUN apk add --no-cache git
+
+# Buildx 설치
+RUN mkdir -p ~/.docker/cli-plugins/ && \
+    curl -SL https://github.com/docker/buildx/releases/download/v0.6.3/buildx-v0.6.3.linux-amd64 -o ~/.docker/cli-plugins/docker-buildx && \
+    chmod +x ~/.docker/cli-plugins/docker-buildx && \
+    docker buildx create --use --name mybuilder && \
+    docker buildx inspect --bootstrap
 
 ARG JAR_PATH=./build/libs
 
