@@ -34,8 +34,6 @@ public class WebhookController {
     }
 
     private ResponseDto<?> handlePushEvent(Map<String, Object> payload, String eventType, String eventId) {
-        // push 이벤트 처리 로직
-        log.info("Processing push event with payload: " + payload);
         cicdService.handleGithubWebhook(payload, eventType, eventId);
         return ResponseDto.ok(null);
     }
