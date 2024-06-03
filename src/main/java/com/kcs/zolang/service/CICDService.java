@@ -164,7 +164,7 @@ public class CICDService {
             Build build = Build.builder()
                     .CICD(cicd)
                     .lastCommitMessage(lastCommitMessage)
-                    .buildNumber(buildRepository.findBuildNumberByCICD(cicd).orElse(0) + 1)
+                    .buildNumber(buildRepository.findBuildNumberByCICD(cicd) + 1)
                     .buildStatus("building")
                     .build();
             buildRepository.save(build);
