@@ -117,47 +117,32 @@ public class CICDService {
         }
     }
 
-    public void handleGithubWebhook(Map<String, Object> payload) {
-        log.info("Received webhook payload: {}", payload);
+    public void handleGithubWebhook(Map<String, Object> payload, String eventType) {
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);
+
+            if (!"push".equals(eventType) && !"pull_request".equals(eventType)) {
+                log.info("Ignoring event: {}", eventType);
+                return;
+            }
 
             JsonNode repositoryNode = rootNode.path("repository");
             if (repositoryNode.isMissingNode() || !repositoryNode.has("name")) {
                 throw new CommonException(ErrorCode.INVALID_PAYLOAD);
             }
             String repoName = repositoryNode.path("name").asText();
-            log.info("Repository name: {}", repoName);
 
+            String branch;
+            String lastCommitMessage;
 
-            String eventType = null;
-
-            // Event type 확인
-            if (rootNode.has("ref")) {
-                eventType = "push";
-            } else if (rootNode.has("pull_request")) {
-                eventType = "pull_request";
+            if ("push".equals(eventType)) {
+                branch = rootNode.path("ref").asText().replace("refs/heads/", "");
+                lastCommitMessage = rootNode.path("head_commit").path("message").asText();
             } else {
-                log.info("payload: {}",payload);
-                throw new CommonException(ErrorCode.INVALID_PAYLOAD);
-            }
-
-            String branch = null;
-            String lastCommitMessage = null;
-
-            switch (eventType) {
-                case "push":
-                    branch = rootNode.path("ref").asText().replace("refs/heads/", "");
-                    lastCommitMessage = rootNode.path("head_commit").path("message").asText();
-                    break;
-                case "pull_request":
-                    JsonNode pullRequestNode = rootNode.path("pull_request");
-                    branch = pullRequestNode.path("head").path("ref").asText();
-                    lastCommitMessage = pullRequestNode.path("head").path("sha").asText();
-                    break;
-                default:
-                    throw new CommonException(ErrorCode.INVALID_PAYLOAD);
+                JsonNode pullRequestNode = rootNode.path("pull_request");
+                branch = pullRequestNode.path("head").path("ref").asText();
+                lastCommitMessage = pullRequestNode.path("head").path("sha").asText();
             }
 
             log.info("Branch name: {}", branch);
@@ -191,10 +176,10 @@ public class CICDService {
                 throw new CommonException(ErrorCode.PIPELINE_ERROR);
             }
         } catch (Exception e) {
-            log.error("Failed to process webhook", e);
             throw new CommonException(ErrorCode.FAILED_PROCESS_WEBHOOK);
         }
     }
+
     public List<CICDDto> getCICDs(Long userId) {
         List<CICD> cicdList = cicdRepository.findByUserId(userId);
         return cicdList.stream().map(cicd -> {
