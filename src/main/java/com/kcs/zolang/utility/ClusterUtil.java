@@ -217,6 +217,7 @@ public class ClusterUtil {
             executeCommand(String.format("rm -rf %s", repoDir));
             return CompletableFuture.completedFuture(null);
         } catch (IOException | InterruptedException | ExecutionException e) {
+            log.error("Exception occurred while running pipeline", e);
             throw new CommonException(ErrorCode.PIPELINE_ERROR);
         }
     }

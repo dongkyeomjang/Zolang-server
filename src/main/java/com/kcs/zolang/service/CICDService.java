@@ -177,6 +177,7 @@ public class CICDService {
             } catch (Exception e) {
                 build.update("failed");
                 buildRepository.save(build);
+                log.error("Failed to process pipeline: {}", e.getMessage());
                 throw new CommonException(ErrorCode.PIPELINE_ERROR);
             }
         } catch (Exception e) {
