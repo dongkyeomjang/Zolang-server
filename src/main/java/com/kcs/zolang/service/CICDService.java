@@ -7,6 +7,7 @@ import com.kcs.zolang.dto.request.CICDRequestDto;
 import com.kcs.zolang.dto.request.EnvVarDto;
 import com.kcs.zolang.dto.response.BuildDto;
 import com.kcs.zolang.dto.response.CICDDto;
+import com.kcs.zolang.dto.response.UserCICDDto;
 import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.*;
@@ -104,7 +105,9 @@ public class CICDService {
 
             try {
                 List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
-                clusterUtil.runPipeline(cicd, environmentVariables, clusterProvidedByZolang, true).get();  // 비동기 작업 완료 대기
+                UserCICDDto userCICDDto = UserCICDDto.fromEntity(user);
+                CICDDto cicdDto = CICDDto.fromEntity(cicd,Build.builder().build());
+                clusterUtil.runPipeline(cicdDto, environmentVariables, clusterProvidedByZolang, userCICDDto, true).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
@@ -157,6 +160,8 @@ public class CICDService {
             }
 
             Long userId = cicd.getUser().getId();
+            UserCICDDto userCICDDto = UserCICDDto.fromEntity(cicd.getUser());
+
             log.info("User ID: {}", userId);
             Cluster clusterProvidedByZolang = clusterRepository.findByProviderAndUserId("zolang", userId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
@@ -170,8 +175,9 @@ public class CICDService {
             buildRepository.save(build);
             try {
                 List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                CICDDto cicdDto = CICDDto.fromEntity(cicd, build);
                 log.info("Environment variables: {}", environmentVariables);
-                clusterUtil.runPipeline(cicd, environmentVariables, clusterProvidedByZolang, false).get();  // 비동기 작업 완료 대기
+                clusterUtil.runPipeline(cicdDto, environmentVariables, clusterProvidedByZolang, userCICDDto, false).get();  // 비동기 작업 완료 대기
                 build.update("success");
                 buildRepository.save(build);
             } catch (Exception e) {
