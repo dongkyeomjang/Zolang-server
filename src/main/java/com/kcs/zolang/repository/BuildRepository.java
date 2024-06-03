@@ -15,4 +15,5 @@ public interface BuildRepository extends JpaRepository<Build, Long> {
     Integer findBuildNumberByCICD(@Param("cicd") CICD cicd);
     List<Build> findByCICD(CICD cicd);
     Optional<Build> findTopByCICDOrderByCreatedAtDesc(CICD cicd);
+    Optional<Build> findByCICDId(Long CICDId);
 }

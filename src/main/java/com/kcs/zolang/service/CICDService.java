@@ -23,9 +23,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.client.HttpClientErrorException;
 import org.springframework.web.client.RestTemplate;
 
+import java.time.Duration;
+import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -121,6 +125,15 @@ public class CICDService {
     }
 
     public void handleGithubWebhook(Map<String, Object> payload, String eventType) {
+        Optional<Build> lastBuildOptional = buildRepository.findTopByCICDOrderByCreatedAtDesc(cicdRepository.findByRepositoryName(payload.get("repository").toString())
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY)));
+        if (lastBuildOptional.isPresent()) {
+            Build lastBuild = lastBuildOptional.get();
+            long timeDifferenceInSeconds = Duration.between(lastBuild.getCreatedAt(), LocalDateTime.now()).getSeconds();
+            if (timeDifferenceInSeconds < 2) {
+                return;
+            }
+        }
         try {
             ObjectMapper objectMapper = new ObjectMapper();
             JsonNode rootNode = objectMapper.convertValue(payload, JsonNode.class);

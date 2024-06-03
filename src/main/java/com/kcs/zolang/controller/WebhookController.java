@@ -26,7 +26,7 @@ public class WebhookController {
                 return handlePushEvent(payload, eventType);
             case "pull_request":
                 return handlePullRequestEvent(payload, eventType);
-            case "ping":
+            case "ping", "check_suite":
                 return ResponseDto.ok(null);
             default:
                 return ResponseDto.fail(new CommonException(ErrorCode.FAILED_CREATE_WEBHOOK));
