@@ -376,15 +376,17 @@ public class ClusterUtil {
                     request.execute();
                 } else if (resource instanceof V1Service service) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    coreV1Api.createNamespacedService("default", service);
+                    CoreV1Api.APIcreateNamespacedServiceRequest request = coreV1Api.createNamespacedService("default", service);
+                    request.execute();
                 } else if (resource instanceof V1Pod pod) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    coreV1Api.createNamespacedPod("default", pod);
+                    CoreV1Api.APIcreateNamespacedPodRequest request = coreV1Api.createNamespacedPod("default", pod);
+                    request.execute();
                 } else if (resource instanceof V1ConfigMap configMap) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    coreV1Api.createNamespacedConfigMap("default", configMap);
+                    CoreV1Api.APIcreateNamespacedConfigMapRequest request = coreV1Api.createNamespacedConfigMap("default", configMap);
+                    request.execute();
                 }
-                // 필요한 경우 다른 리소스 타입에 대한 처리 추가
                 else {
                     throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
                 }
