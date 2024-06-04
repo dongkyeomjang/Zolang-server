@@ -90,4 +90,7 @@ public class User {
                 .role(ERole.USER)
                 .build();
     }
+    public void updateEmail(String email) {
+        this.email = email;
+    }
 }
