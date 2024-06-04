@@ -37,17 +37,31 @@ public class CustomOauth2UserDetailService extends DefaultOAuth2UserService {
         UserRepository.UserSecurityForm securityForm = userRepository.findSecurityFormBySerialId(oauth2UserInfo.getId())
                 .orElseGet(() -> {
                             log.info("새로운 사용자 접근, 저장 로직 진입");
-                            User newUser = userRepository.save(
-                                    User.builder()
-                                            .serialId(oauth2UserInfo.getId())
-                                            .password(bCryptPasswordEncoder.encode(UUID.randomUUID().toString()))
-                                            .provider(provider)
-                                            .role(ERole.GUEST)
-                                            .nickname(oauth2UserInfo.getAttributes().get("login").toString())
-                                            .email(oauth2UserInfo.getAttributes().get("email").toString())
-                                            .profileImage(oauth2UserInfo.getAttributes().get("avatar_url").toString())
-                                            .build()
-                            );
+                            User newUser = null;
+                            if(oauth2UserInfo.getAttributes().get("email")==null){
+                                newUser = userRepository.save(
+                                        User.builder()
+                                                .serialId(oauth2UserInfo.getId())
+                                                .password(bCryptPasswordEncoder.encode(UUID.randomUUID().toString()))
+                                                .provider(provider)
+                                                .role(ERole.GUEST)
+                                                .nickname(oauth2UserInfo.getAttributes().get("login").toString())
+                                                .profileImage(oauth2UserInfo.getAttributes().get("avatar_url").toString())
+                                                .build()
+                                );
+                            } else {
+                                newUser = userRepository.save(
+                                        User.builder()
+                                                .serialId(oauth2UserInfo.getId())
+                                                .password(bCryptPasswordEncoder.encode(UUID.randomUUID().toString()))
+                                                .provider(provider)
+                                                .role(ERole.GUEST)
+                                                .nickname(oauth2UserInfo.getAttributes().get("login").toString())
+                                                .email(oauth2UserInfo.getAttributes().get("email").toString())
+                                                .profileImage(oauth2UserInfo.getAttributes().get("avatar_url").toString())
+                                                .build()
+                                );
+                            }
                             return UserRepository.UserSecurityForm.invoke(newUser);
                         }
                 );
