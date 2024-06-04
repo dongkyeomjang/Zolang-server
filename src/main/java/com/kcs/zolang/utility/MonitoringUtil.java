@@ -136,15 +136,18 @@ public class MonitoringUtil {
                 for (V1Pod pod : podList.getItems()) {
                     String name = pod.getMetadata().getName();
                     String namespace = pod.getMetadata().getNamespace();
+                    List<PodMetrics> usageList;
                     PodMetrics usage;
                     try {
+                        usageList = metrics.getPodMetrics(pod.getMetadata().getNamespace())
+                            .getItems();
+                        if (usageList.isEmpty()) {
+                            continue;
+                        }
                         usage = metrics.getPodMetrics(pod.getMetadata().getNamespace()).getItems()
                             .get(0);
                     } catch (ApiException e) {
                         log.info("Metrics not found pod");
-                        continue;
-                    }
-                    if (usage == null) {
                         continue;
                     }
                     UsageDto podUsage = UsageDto.fromEntity(usage, time);
