@@ -17,8 +17,7 @@ import io.kubernetes.client.openapi.models.V1ConfigMap;
 import io.kubernetes.client.openapi.models.V1Deployment;
 import io.kubernetes.client.openapi.models.V1Pod;
 import io.kubernetes.client.openapi.models.V1Service;
-import io.kubernetes.client.util.ClientBuilder;
-import io.kubernetes.client.util.KubeConfig;
+import io.kubernetes.client.util.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,11 +39,6 @@ public class ClusterUtil {
     @Value("${aws.ecr.repository.prefix}")
     private String ecrRepositoryPrefix;
     private final JobQueueUtility jobQueueUtility;
-
-    private ApiClient buildApiClient(String kubeConfigContent) throws IOException {
-        KubeConfig config = KubeConfig.loadKubeConfig(new StringReader(kubeConfigContent));
-        return ClientBuilder.kubeconfig(config).build();
-    }
 
     public void createKubeconfig(Cluster cluster) {
         String command = String.format("aws eks update-kubeconfig --name %s --region %s", cluster.getClusterName(), awsRegion);
@@ -88,13 +82,12 @@ public class ClusterUtil {
         }
     }
 
-
     public void createServiceAccountWithKubectl(Cluster cluster) {
         try {
-            String clusterName = cluster.getClusterName();
-            String saName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "sa";
-            String roleName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "role";
-            String roleBindingName = clusterName.toLowerCase().replaceAll("[^a-z0-9]", "") + "rolebinding";
+            String clusterName = cluster.getClusterName().toLowerCase().replaceAll("[^a-zA-Z0-9]", "");
+            String saName = clusterName + "sa";
+            String roleName = clusterName + "role";
+            String roleBindingName = clusterName + "rolebinding";
 
             log.info("Creating service account with name: {}", saName);
             // 서비스 계정 생성
@@ -125,12 +118,16 @@ public class ClusterUtil {
                     "rules:\n" +
                     "- apiGroups: [\"\"]\n" +
                     "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\", \"namespaces\"]\n" +
-                    "  verbs: [\"get\", \"list\", \"watch\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
+                    "- apiGroups: [\"apps\"]\n" +
+                    "  resources: [\"deployments\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
                     "- apiGroups: [\"metrics.k8s.io\"]\n" +
                     "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\",\"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
                     "EOF", roleName);
             log.info("Executing command: {}", roleCommand);
+
             executeCommand(roleCommand);
 
             // 역할 바인딩 생성
@@ -168,24 +165,20 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-    public void rolloutDeployment(CICDDto cicdDto, Cluster cluster, List<EnvironmentVariable> environmentVariables) {
-        try {
-            ApiClient client = buildApiClient(generateKubeConfig(cluster));
-            Configuration.setDefaultApiClient(client);
-            AppsV1Api api = new AppsV1Api();
+    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables) {
+        ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
+        Configuration.setDefaultApiClient(client);
+        AppsV1Api api = new AppsV1Api();
 
-            // Deployment 삭제
-            api.deleteNamespacedDeployment(cicdDto.repositoryName(), "default");
-            log.info("Deleted existing deployment: {}", cicdDto.repositoryName());
+        // Deployment 삭제
+        api.deleteNamespacedDeployment(repoName, "default");
+        log.info("Deleted existing deployment: {}", repoName);
 
-            // 새로운 Deployment 생성
-            String deploymentYaml = generateDeploymentYaml(cicdDto, environmentVariables);
-            applyYamlToCluster(deploymentYaml, cluster);
-            log.info("Applied new deployment: {}", cicdDto.repositoryName());
+        // 새로운 Deployment 생성
+        String deploymentYaml = generateDeploymentYaml(repoName, environmentVariables);
+        applyYamlToCluster(deploymentYaml, cluster);
+        log.info("Applied new deployment: {}", repoName);
 
-        } catch (IOException e) {
-            throw new CommonException(ErrorCode.PIPELINE_ERROR);
-        }
     }
 
     @Async("taskExecutor")
@@ -194,6 +187,7 @@ public class ClusterUtil {
 
         jobQueueUtility.addJob(userCICDDto.id(), () -> {
             try {
+                String repoName = cicdDto.repositoryName().toLowerCase().replaceAll("[^a-zA-Z0-9]", "");
                 String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
                 String repoDir = "/app/resources/repo/" + cicdDto.repositoryName();
 
@@ -219,9 +213,9 @@ public class ClusterUtil {
                 executeCommand(String.format("docker push %s", imageName));
 
                 if (isFirstRun) {
-                    applyYamlToCluster(generateDeploymentYaml(cicdDto, environmentVariables), cluster);
+                    applyYamlToCluster(generateDeploymentYaml(repoName, environmentVariables), cluster);
                 } else {
-                    rolloutDeployment(cicdDto, cluster, environmentVariables);
+                    rolloutDeployment(repoName, cluster, environmentVariables);
                 }
                 executeCommand(String.format("rm -rf %s", repoDir));
                 future.complete(null);
@@ -234,7 +228,7 @@ public class ClusterUtil {
         return future;
     }
 
-    private String generateDeploymentYaml(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables) {
+    private String generateDeploymentYaml(String repoName, List<EnvironmentVariable> environmentVariables) {
         StringBuilder envVarsBuilder = new StringBuilder();
         if (environmentVariables != null && !environmentVariables.isEmpty()) {
             envVarsBuilder.append("        env:\n");
@@ -245,9 +239,9 @@ public class ClusterUtil {
             }
         }
 
-        String deploymentName = cicdDto.repositoryName();
+        String deploymentName = repoName;
         String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
-                awsAccountId, awsRegion, ecrRepositoryPrefix, cicdDto.repositoryName());
+                awsAccountId, awsRegion, ecrRepositoryPrefix, repoName);
         return String.format(
                 "apiVersion: apps/v1\n" +
                         "kind: Deployment\n" +
@@ -370,35 +364,35 @@ public class ClusterUtil {
         try {
             // YAML 파일을 읽어서 여러 개의 Kubernetes 리소스 객체로 변환
             List<Object> resources = io.kubernetes.client.util.Yaml.loadAll(yaml);
-            ApiClient client = buildApiClient(generateKubeConfig(cluster));
+            ApiClient client = Config.fromToken("https://" + cluster.getDomainUrl(), cluster.getSecretToken(),false);
             Configuration.setDefaultApiClient(client);
 
             // 각 리소스 객체를 적절한 API를 사용하여 Kubernetes 클러스터에 적용
             for (Object resource : resources) {
-                if (resource instanceof io.kubernetes.client.openapi.models.V1Deployment) {
-                    AppsV1Api appsV1Api = new AppsV1Api();
+                if (resource instanceof V1Deployment) {
                     V1Deployment deployment = (V1Deployment) resource;
-                    appsV1Api.createNamespacedDeployment("default", deployment);
-                } else if (resource instanceof io.kubernetes.client.openapi.models.V1Service) {
+                    AppsV1Api appsV1Api = new AppsV1Api();
+                    AppsV1Api.APIcreateNamespacedDeploymentRequest request = appsV1Api.createNamespacedDeployment("default", deployment);
+                    request.execute();
+                } else if (resource instanceof V1Service service) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    V1Service service = (V1Service) resource;
-                    coreV1Api.createNamespacedService("default", service);
-                } else if (resource instanceof io.kubernetes.client.openapi.models.V1Pod) {
+                    CoreV1Api.APIcreateNamespacedServiceRequest request = coreV1Api.createNamespacedService("default", service);
+                    request.execute();
+                } else if (resource instanceof V1Pod pod) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    V1Pod pod = (V1Pod) resource;
-                    coreV1Api.createNamespacedPod("default", pod);
-                } else if (resource instanceof io.kubernetes.client.openapi.models.V1ConfigMap) {
+                    CoreV1Api.APIcreateNamespacedPodRequest request = coreV1Api.createNamespacedPod("default", pod);
+                    request.execute();
+                } else if (resource instanceof V1ConfigMap configMap) {
                     CoreV1Api coreV1Api = new CoreV1Api();
-                    V1ConfigMap configMap = (V1ConfigMap) resource;
-                    coreV1Api.createNamespacedConfigMap("default", configMap);
+                    CoreV1Api.APIcreateNamespacedConfigMapRequest request = coreV1Api.createNamespacedConfigMap("default", configMap);
+                    request.execute();
                 }
-                // 필요한 경우 다른 리소스 타입에 대한 처리 추가
                 else {
                     throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
                 }
             }
         } catch (Exception e) {
-            throw new RuntimeException("Failed to apply YAML", e);
+            e.printStackTrace();
         }
     }
 
