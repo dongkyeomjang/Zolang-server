@@ -92,13 +92,15 @@ public class CICDService {
                     .trigger(String.join(",", requestDto.trigger()))
                     .build();
             cicdRepository.save(cicd);
-            for (EnvVarDto envVarDto : requestDto.envVars()){
-                EnvironmentVariable environmentVariable = EnvironmentVariable.builder()
-                        .key(envVarDto.key())
-                        .value(envVarDto.value())
-                        .CICD(cicd)
-                        .build();
-                envVarRepository.save(environmentVariable);
+            if(requestDto.envVars() != null && !requestDto.envVars().isEmpty()){
+                for (EnvVarDto envVarDto : requestDto.envVars()){
+                    EnvironmentVariable environmentVariable = EnvironmentVariable.builder()
+                            .key(envVarDto.key())
+                            .value(envVarDto.value())
+                            .CICD(cicd)
+                            .build();
+                    envVarRepository.save(environmentVariable);
+                }
             }
             Build build = Build.builder()
                             .CICD(cicd)
@@ -109,7 +111,10 @@ public class CICDService {
             buildRepository.save(build);
 
             try {
-                List<EnvironmentVariable> environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                List<EnvironmentVariable> environmentVariables = null;
+                if(!envVarRepository.findByCICDId(cicd.getId()).isEmpty()){
+                    environmentVariables = envVarRepository.findByCICDId(cicd.getId());
+                }
                 UserCICDDto userCICDDto = UserCICDDto.fromEntity(user);
                 CICDDto cicdDto = CICDDto.fromEntity(cicd,Build.builder().build());
                 clusterUtil.runPipeline(cicdDto, environmentVariables, clusterProvidedByZolang, userCICDDto, true).get();  // 비동기 작업 완료 대기
