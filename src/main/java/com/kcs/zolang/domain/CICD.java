@@ -52,8 +52,8 @@ public class CICD {
         this.createdAt = LocalDateTime.now();
         this.branch = branch;
         this.language = language;
-        this.languageVersion = languageVersion;
-        this.buildTool = buildTool;
+        this.languageVersion = (languageVersion != null) ? languageVersion : "none";
+        this.buildTool = (buildTool != null) ? buildTool : "none";
         this.trigger = trigger;
     }
 
