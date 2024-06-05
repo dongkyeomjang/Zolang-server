@@ -122,7 +122,10 @@ public class ClusterUtil {
                     "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\", \"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
                     "- apiGroups: [\"apps\"]\n" +
-                    "  resources: [\"deployments\"]\n" +
+                    "  resources: [\"deployments\", \"replicasets\", \"daemonsets\", \"statefulsets\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
+                    "- apiGroups: [\"batch\"]\n" +
+                    "  resources: [\"jobs\", \"cronjobs\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
                     "- apiGroups: [\"metrics.k8s.io\"]\n" +
                     "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\",\"namespaces\"]\n" +
@@ -195,12 +198,26 @@ public class ClusterUtil {
 
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
 
-                BuildTool buildTool = BuildToolFactory.detectBuildTool(repoDir, cicdDto.buildTool());
+                BuildTool buildTool = null;
+
+                if(cicdDto.buildTool()==null){ // python일 경우
+                    buildTool = BuildToolFactory.detectBuildTool(repoDir, "none");
+                } else{
+                    buildTool = BuildToolFactory.detectBuildTool(repoDir, cicdDto.buildTool());
+                }
+
                 String setupCommand = buildTool.setup(repoDir);
+
                 if (setupCommand != null) {
                     executeCommand(setupCommand);
                 }
-                executeCommand(buildTool.build(repoDir));
+
+                String buildCommand = buildTool.build(repoDir);
+
+                // python인경우 buildCommand가 null
+                if(buildCommand != null) {
+                    executeCommand(buildCommand);
+                }
 
                 String ecrLoginCommand = String.format("aws ecr get-login-password --region %s | docker login --username AWS --password-stdin %s.dkr.ecr.%s.amazonaws.com",
                         awsRegion, awsAccountId, awsRegion);
@@ -211,8 +228,8 @@ public class ClusterUtil {
                 String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
                         awsAccountId, awsRegion, ecrRepositoryPrefix, ecrRepoName);
                 createEcrRepositoryIfNotExists(String.format("%s-%s", ecrRepositoryPrefix, ecrRepoName));
-                executeCommand(String.format("cd %s && docker build -t %s .", repoDir, imageName));
-                executeCommand(String.format("docker push %s", imageName));
+                executeCommand("docker buildx create --use && docker buildx inspect --bootstrap");
+                executeCommand(String.format("cd %s && docker buildx build --platform linux/arm64 -t %s --push .", repoDir, imageName));
 
                 if (isFirstRun) {
                     applyYamlToCluster(generateDeploymentYaml(repoName, environmentVariables), cluster);
