@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.models.V1Service;
 import io.kubernetes.client.util.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.jasypt.encryption.StringEncryptor;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Component;
@@ -39,6 +40,7 @@ public class ClusterUtil {
     @Value("${aws.ecr.repository.prefix}")
     private String ecrRepositoryPrefix;
     private final JobQueueUtility jobQueueUtility;
+    private final StringEncryptor stringEncryptor;
 
     public void createKubeconfig(Cluster cluster) {
         String command = String.format("aws eks update-kubeconfig --name %s --region %s", cluster.getClusterName(), awsRegion);
@@ -188,7 +190,7 @@ public class ClusterUtil {
         jobQueueUtility.addJob(userCICDDto.id(), () -> {
             try {
                 String repoName = cicdDto.repositoryName().toLowerCase().replaceAll("[^a-zA-Z0-9]", "");
-                String repoUrl = String.format("https://github.com/%s/%s.git", userCICDDto.nickname(), cicdDto.repositoryName());
+                String repoUrl = String.format("https://%s@github.com/%s/%s.git",stringEncryptor.decrypt(userCICDDto.githubAccessToken()), userCICDDto.nickname(), cicdDto.repositoryName());
                 String repoDir = "/app/resources/repo/" + cicdDto.repositoryName();
 
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));

@@ -20,6 +20,7 @@ import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
 import jakarta.transaction.Transactional;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
@@ -42,15 +43,13 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeCondition;
 import io.kubernetes.client.openapi.models.V1NodeList;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class ClusterService {
     private final MonitoringUtil monitoringUtil;
     private final ClusterUtil clusterUtil;
-    private static final Logger log = LoggerFactory.getLogger(NetworkService.class);
     private final ClusterRepository clusterRepository;
     private final UserRepository userRepository;
     private final EksClient eksClient;

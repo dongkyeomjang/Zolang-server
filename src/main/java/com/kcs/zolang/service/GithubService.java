@@ -35,16 +35,15 @@ public class GithubService {
     }
 
     public List<GitRepoDto> getRepositories(Long userId) {
-        String nickname = getUserNickname(userId);
+        String token = getUserGithubToken(userId);
 
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl("https://api.github.com")
-                .path("/users/" + nickname + "/repos");
+                .fromHttpUrl("https://api.github.com/user/repos");
 
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
                 builder.build().encode().toUri(),
                 HttpMethod.GET,
-                new HttpEntity<>(null, null),
+                new HttpEntity<>(null, createHeaders(token)),
                 (Class<List<Map<String, Object>>>)(Class<?>)List.class);
 
         List<Map<String, Object>> repos = response.getBody();
@@ -57,16 +56,16 @@ public class GithubService {
     }
 
     public List<GitBranchDto> getBranches(Long userId, String repoName) {
+        String token = getUserGithubToken(userId);
         String nickname = getUserNickname(userId);
 
         UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl("https://api.github.com")
-                .path("/repos/" + nickname + "/" + repoName + "/branches");
+                .fromHttpUrl("https://api.github.com/repos/" + nickname + "/" + repoName + "/branches");
 
         ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
                 builder.build().encode().toUri(),
                 HttpMethod.GET,
-                new HttpEntity<>(null, null),
+                new HttpEntity<>(null, createHeaders(token)),
                 (Class<List<Map<String, Object>>>)(Class<?>)List.class);
 
         List<Map<String, Object>> branches = response.getBody();
