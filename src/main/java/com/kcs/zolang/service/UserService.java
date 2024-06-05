@@ -18,4 +18,11 @@ public class UserService {
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
         return UserDetailDto.fromEntity(user);
     }
+    public UserDetailDto updateEmail(Long userId, String email) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_USER));
+        user.updateEmail(email);
+        userRepository.save(user);
+        return UserDetailDto.fromEntity(user);
+    }
 }

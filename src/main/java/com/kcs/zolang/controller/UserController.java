@@ -22,4 +22,10 @@ public class UserController {
     public ResponseDto<?> getUserInfo(@UserId Long userId) {
         return ResponseDto.ok(userService.getUserInfo(userId));
     }
+
+    @PatchMapping("/email")
+    @Operation(summary = "이메일 수정", description = "유저의 이메일을 수정합니다.")
+    public ResponseDto<?> updateEmail(@UserId Long userId, @RequestParam String email) {
+        return ResponseDto.ok(userService.updateEmail(userId, email));
+    }
 }
