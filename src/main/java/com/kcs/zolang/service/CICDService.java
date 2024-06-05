@@ -87,8 +87,8 @@ public class CICDService {
                     .repositoryName(requestDto.repoName())
                     .branch(requestDto.branch())
                     .language(requestDto.language())
-                    .languageVersion(requestDto.version())
-                    .buildTool(requestDto.buildTool())
+                    .languageVersion(requestDto.version() != null ? requestDto.version() : "none")
+                    .buildTool(requestDto.buildTool() != null ? requestDto.buildTool() : "none")
                     .trigger(String.join(",", requestDto.trigger()))
                     .build();
             cicdRepository.save(cicd);
