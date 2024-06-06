@@ -21,12 +21,6 @@ import io.kubernetes.client.openapi.ApiException;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeList;
-import lombok.RequiredArgsConstructor;
-import lombok.extern.slf4j.Slf4j;
-import org.springframework.scheduling.annotation.Scheduled;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
 import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -35,6 +29,11 @@ import java.time.temporal.ChronoUnit;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.scheduling.annotation.Scheduled;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 
 @Service
@@ -49,10 +48,10 @@ public class UserUsageService {
     private final BillRepository billRepository;
 
     //모든 클러스터 총 합(실시간)
-    public UserUsageDto getUserUsage(Long userId) throws Exception {
+    public UserUsageDto getUserUsage(Long userId) {
         List<Cluster> clusters = clusterRepository.findByUserId(userId).stream()
-                .filter(cluster -> "zolang".equals(cluster.getProvider()))
-                .collect(Collectors.toList());
+            .filter(cluster -> "zolang".equals(cluster.getProvider()))
+            .collect(Collectors.toList());
 
         if (clusters.isEmpty()) {
             throw new CommonException(ErrorCode.NOT_FOUND_CLUSTER);
@@ -80,27 +79,37 @@ public class UserUsageService {
 
                 for (V1Node node : nodes) {
                     NodeMetrics nodeMetrics = metricsList.getItems().stream()
-                            .filter(metric -> metric.getMetadata().getName().equals(node.getMetadata().getName()))
-                            .findFirst()
-                            .orElse(null);
+                        .filter(metric -> metric.getMetadata().getName()
+                            .equals(node.getMetadata().getName()))
+                        .findFirst()
+                        .orElse(null);
 
                     if (nodeMetrics != null) {
-                        totalCpuUsage += Double.parseDouble(nodeMetrics.getUsage().get("cpu").getNumber().toString());
-                        totalMemoryUsage += nodeMetrics.getUsage().get("memory").getNumber().longValue();
+                        totalCpuUsage += Double.parseDouble(
+                            nodeMetrics.getUsage().get("cpu").getNumber().toString());
+                        totalMemoryUsage += nodeMetrics.getUsage().get("memory").getNumber()
+                            .longValue();
                     }
 
-                    totalCpuAllocatable += Double.parseDouble(node.getStatus().getAllocatable().get("cpu").getNumber().toString());
-                    totalMemoryAllocatable += node.getStatus().getAllocatable().get("memory").getNumber().longValue();
-                    totalPodAllocatable += Integer.parseInt(node.getStatus().getAllocatable().get("pods").getNumber().toString());
+                    totalCpuAllocatable += Double.parseDouble(
+                        node.getStatus().getAllocatable().get("cpu").getNumber().toString());
+                    totalMemoryAllocatable += node.getStatus().getAllocatable().get("memory")
+                        .getNumber().longValue();
+                    totalPodAllocatable += Integer.parseInt(
+                        node.getStatus().getAllocatable().get("pods").getNumber().toString());
 
-                    totalCpuCapacity += Double.parseDouble(node.getStatus().getCapacity().get("cpu").getNumber().toString());
-                    totalMemoryCapacity += node.getStatus().getCapacity().get("memory").getNumber().longValue();
-                    totalPodCapacity += Integer.parseInt(node.getStatus().getCapacity().get("pods").getNumber().toString());
+                    totalCpuCapacity += Double.parseDouble(
+                        node.getStatus().getCapacity().get("cpu").getNumber().toString());
+                    totalMemoryCapacity += node.getStatus().getCapacity().get("memory").getNumber()
+                        .longValue();
+                    totalPodCapacity += Integer.parseInt(
+                        node.getStatus().getCapacity().get("pods").getNumber().toString());
                 }
 
-                totalPodUsage += (int) coreV1Api.listPodForAllNamespaces().execute().getItems().stream()
-                        .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
-                        .count();
+                totalPodUsage += (int) coreV1Api.listPodForAllNamespaces().execute().getItems()
+                    .stream()
+                    .filter(pod -> "Running".equals(pod.getStatus().getPhase()))
+                    .count();
 
             } catch (ApiException e) {
                 throw new RuntimeException("API error", e);
@@ -108,15 +117,15 @@ public class UserUsageService {
         }
 
         return new UserUsageDto(
-                totalCpuUsage,
-                totalCpuAllocatable,
-                totalCpuCapacity,
-                totalMemoryUsage,
-                totalMemoryAllocatable,
-                totalMemoryCapacity,
-                totalPodUsage,
-                totalPodAllocatable,
-                totalPodCapacity
+            totalCpuUsage,
+            totalCpuAllocatable,
+            totalCpuCapacity,
+            totalMemoryUsage,
+            totalMemoryAllocatable,
+            totalMemoryCapacity,
+            totalPodUsage,
+            totalPodAllocatable,
+            totalPodCapacity
         );
     }
 
@@ -125,25 +134,22 @@ public class UserUsageService {
     public void saveHourlyUserUsage() {
         List<User> users = userRepository.findAll();
         for (User user : users) {
-            try {
-                UserUsageDto userUsageDto = getUserUsage(user.getId());
+            UserUsageDto userUsageDto = getUserUsage(user.getId());
 
-                Usage usage = Usage.builder()
-                        .user(user)
-                        .cpuUsage(userUsageDto.cpuUsage())
-                        .cpuCapacity(userUsageDto.cpuCapacity())
-                        .cpuAllo(userUsageDto.cpuAllocatable())
-                        .memoryUsage(userUsageDto.memoryUsage())
-                        .memoryCapacity(userUsageDto.memoryCapacity())
-                        .memoryAllo(userUsageDto.memoryAllocatable())
-                        .podUsage(userUsageDto.podUsage())
-                        .podCapacity(userUsageDto.podCapacity())
-                        .podAllo(userUsageDto.podAllocatable())
-                        .build();
+            Usage usage = Usage.builder()
+                .user(user)
+                .cpuUsage(userUsageDto.cpuUsage())
+                .cpuCapacity(userUsageDto.cpuCapacity())
+                .cpuAllo(userUsageDto.cpuAllocatable())
+                .memoryUsage(userUsageDto.memoryUsage())
+                .memoryCapacity(userUsageDto.memoryCapacity())
+                .memoryAllo(userUsageDto.memoryAllocatable())
+                .podUsage(userUsageDto.podUsage())
+                .podCapacity(userUsageDto.podCapacity())
+                .podAllo(userUsageDto.podAllocatable())
+                .build();
 
-                usageRepository.save(usage);
-            } catch (Exception e) {
-            }
+            usageRepository.save(usage);
         }
     }
 
@@ -178,7 +184,8 @@ public class UserUsageService {
         List<User> users = userRepository.findAll();
 
         for (User user : users) {
-            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(user.getId(), startOfDay, endOfDay);
+            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(user.getId(),
+                startOfDay, endOfDay);
 
             double totalCpuUsage = usages.stream().mapToDouble(Usage::getCpuUsage).sum();
             double totalCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).sum();
@@ -201,7 +208,8 @@ public class UserUsageService {
                 if (clusterCreatedAt.isBefore(startOfDay)) {
                     // 클러스터 생성일이 하루 시작 전인 경우
                     runtimeMinutes = 1440; // 하루 1440분
-                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(endOfDay)) {
+                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(
+                    endOfDay)) {
                     // 클러스터 생성일이 하루 중인 경우
                     runtimeMinutes = Duration.between(clusterCreatedAt, endOfDay).toMinutes();
                 } else {
@@ -213,13 +221,13 @@ public class UserUsageService {
             }
 
             Bill bill = Bill.builder()
-                    .user(user)
-                    .cpuCost(cpuCost)
-                    .memoryCost(memoryCost)
-                    .podCost(podCost)
-                    .runtimeCost(runtimeCost)
-                    .date(String.valueOf(LocalDate.now().minusDays(1)))
-                    .build();
+                .user(user)
+                .cpuCost(Double.isNaN(cpuCost) ? 0 : cpuCost)
+                .memoryCost(Double.isNaN(memoryCost) ? 0 : memoryCost)
+                .podCost(Double.isNaN(podCost) ? 0 : podCost)
+                .runtimeCost(runtimeCost)
+                .date(String.valueOf(LocalDate.now().minusDays(1)))
+                .build();
 
             billRepository.save(bill);
             log.info("하루치 bill 저장 완: " + user.getId());
@@ -233,34 +241,42 @@ public class UserUsageService {
         LocalDateTime endOfDay = date.minusDays(1).atTime(LocalTime.MAX);
 
         // 전날의 데이터
-        List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay, endOfDay);
+        List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay,
+            endOfDay);
 
         if (usages.isEmpty()) {
             // 전날 데이터 없는 경우 0으로
             log.info("No usages found for user: {}", userId);
             return new UserUsageDto(
-                    0.0,
-                    0.0,
-                    0.0,
-                    0L,
-                    0L,
-                    0L,
-                    0,
-                    0,
-                    0
+                0.0,
+                0.0,
+                0.0,
+                0L,
+                0L,
+                0L,
+                0,
+                0,
+                0
             );
         }
 
         //평균 계산
         double avgCpuUsage = usages.stream().mapToDouble(Usage::getCpuUsage).average().orElse(0);
-        double avgCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).average().orElse(0);
-        double avgCpuAllocatable = usages.stream().mapToDouble(Usage::getCpuAllo).average().orElse(0);
-        long avgMemoryUsage = (long) usages.stream().mapToLong(Usage::getMemoryUsage).average().orElse(0);
-        long avgMemoryCapacity = (long) usages.stream().mapToLong(Usage::getMemoryCapacity).average().orElse(0);
-        long avgMemoryAllocatable = (long) usages.stream().mapToLong(Usage::getMemoryAllo).average().orElse(0);
+        double avgCpuCapacity = usages.stream().mapToDouble(Usage::getCpuCapacity).average()
+            .orElse(0);
+        double avgCpuAllocatable = usages.stream().mapToDouble(Usage::getCpuAllo).average()
+            .orElse(0);
+        long avgMemoryUsage = (long) usages.stream().mapToLong(Usage::getMemoryUsage).average()
+            .orElse(0);
+        long avgMemoryCapacity = (long) usages.stream().mapToLong(Usage::getMemoryCapacity)
+            .average().orElse(0);
+        long avgMemoryAllocatable = (long) usages.stream().mapToLong(Usage::getMemoryAllo).average()
+            .orElse(0);
         int avgPodUsage = (int) usages.stream().mapToInt(Usage::getPodUsage).average().orElse(0);
-        int avgPodCapacity = (int) usages.stream().mapToInt(Usage::getPodCapacity).average().orElse(0);
-        int avgPodAllocatable = (int) usages.stream().mapToInt(Usage::getPodAllo).average().orElse(0);
+        int avgPodCapacity = (int) usages.stream().mapToInt(Usage::getPodCapacity).average()
+            .orElse(0);
+        int avgPodAllocatable = (int) usages.stream().mapToInt(Usage::getPodAllo).average()
+            .orElse(0);
 
         log.info("Avg CPU Usage: {}", avgCpuUsage);
         log.info("Avg CPU Capacity: {}", avgCpuCapacity);
@@ -273,15 +289,15 @@ public class UserUsageService {
         log.info("Avg Pod Allocatable: {}", avgPodAllocatable);
 
         return new UserUsageDto(
-                avgCpuUsage,
-                avgCpuAllocatable,
-                avgCpuCapacity,
-                avgMemoryUsage,
-                avgMemoryAllocatable,
-                avgMemoryCapacity,
-                avgPodUsage,
-                avgPodAllocatable,
-                avgPodCapacity
+            avgCpuUsage,
+            avgCpuAllocatable,
+            avgCpuCapacity,
+            avgMemoryUsage,
+            avgMemoryAllocatable,
+            avgMemoryCapacity,
+            avgPodUsage,
+            avgPodAllocatable,
+            avgPodCapacity
         );
     }
 
@@ -291,7 +307,8 @@ public class UserUsageService {
         List<UserUsageBillDto> usageBills = new ArrayList<>();
 
         for (int i = 1; i <= 4; i++) {
-            LocalDateTime endOfDay = now.minusDays(i).truncatedTo(ChronoUnit.DAYS).plusDays(1).minusNanos(1);
+            LocalDateTime endOfDay = now.minusDays(i).truncatedTo(ChronoUnit.DAYS).plusDays(1)
+                .minusNanos(1);
             LocalDateTime startOfDay = now.minusDays(i).truncatedTo(ChronoUnit.DAYS);
 
             double totalCpuUsage = 0;
@@ -299,7 +316,8 @@ public class UserUsageService {
             int totalPodUsage = 0;
             long totalClusterRuntime = 0;
 
-            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId, startOfDay, endOfDay);
+            List<Usage> usages = usageRepository.findAllByUserIdAndCreatedAtBetween(userId,
+                startOfDay, endOfDay);
 
             for (Usage usage : usages) {
                 totalCpuUsage += usage.getCpuUsage();
@@ -313,7 +331,8 @@ public class UserUsageService {
 
                 if (clusterCreatedAt.isBefore(startOfDay)) {
                     totalClusterRuntime += 1440; // 하루 1440분
-                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(endOfDay)) {
+                } else if (clusterCreatedAt.isAfter(startOfDay) && clusterCreatedAt.isBefore(
+                    endOfDay)) {
                     totalClusterRuntime += Duration.between(clusterCreatedAt, endOfDay).toMinutes();
                 } else if (clusterCreatedAt.isEqual(startOfDay)) {
                     totalClusterRuntime += Duration.between(clusterCreatedAt, endOfDay).toMinutes();
@@ -321,20 +340,23 @@ public class UserUsageService {
 
             }
 
-            Bill bill = billRepository.findByUserIdAndDate(userId, startOfDay.toLocalDate().toString());
+            Bill bill = billRepository.findByUserIdAndDate(userId,
+                startOfDay.toLocalDate().toString());
 
             UserUsageBillDto usageBill = UserUsageBillDto.builder()
-                    .date(startOfDay.toLocalDate().toString())
-                    .totalCpuUsage(totalCpuUsage)
-                    .totalCpuCost(bill != null ? bill.getCpuCost() : 0)
-                    .totalMemoryUsage(totalMemoryUsage)
-                    .totalMemoryCost(bill != null ? bill.getMemoryCost() : 0)
-                    .totalPodUsage(totalPodUsage)
-                    .totalPodCost(bill != null ? bill.getPodCost() : 0)
-                    .totalClusterRuntime(totalClusterRuntime)
-                    .totalClusterRuntimeCost(totalClusterRuntime*150)
-                    .totalCost(bill != null ? bill.getCpuCost() + bill.getMemoryCost() + bill.getPodCost() + (totalClusterRuntime * 150) : 0)
-                    .build();
+                .date(startOfDay.toLocalDate().toString())
+                .totalCpuUsage(totalCpuUsage)
+                .totalCpuCost(bill != null ? bill.getCpuCost() : 0)
+                .totalMemoryUsage(totalMemoryUsage)
+                .totalMemoryCost(bill != null ? bill.getMemoryCost() : 0)
+                .totalPodUsage(totalPodUsage)
+                .totalPodCost(bill != null ? bill.getPodCost() : 0)
+                .totalClusterRuntime(totalClusterRuntime)
+                .totalClusterRuntimeCost(totalClusterRuntime * 150)
+                .totalCost(
+                    bill != null ? bill.getCpuCost() + bill.getMemoryCost() + bill.getPodCost() + (
+                        totalClusterRuntime * 150) : 0)
+                .build();
 
             usageBills.add(usageBill);
         }
@@ -342,7 +364,7 @@ public class UserUsageService {
         return usageBills;
     }
 
-    public List<UserUsageBillDto> getRealTimeBill(Long userId) throws Exception {
+    public List<UserUsageBillDto> getRealTimeBill(Long userId) {
         List<UserUsageBillDto> usageBills = getUserUsageBill(userId);
 
         // 실시간 데이터
@@ -350,7 +372,8 @@ public class UserUsageService {
 
         //분모 0일 경우 제외
         double cpuCapacity = realTimeUsage.cpuCapacity() != 0 ? realTimeUsage.cpuCapacity() : 1;
-        double memoryCapacity = realTimeUsage.memoryCapacity() != 0 ? realTimeUsage.memoryCapacity() : 1;
+        double memoryCapacity =
+            realTimeUsage.memoryCapacity() != 0 ? realTimeUsage.memoryCapacity() : 1;
         double podCapacity = realTimeUsage.podCapacity() != 0 ? realTimeUsage.podCapacity() : 1;
 
         double realTimeCpuCost = (realTimeUsage.cpuUsage() / cpuCapacity) * 15000;
@@ -365,29 +388,31 @@ public class UserUsageService {
             LocalDateTime clusterCreatedAt = cluster.getCreatedAt();
 
             if (clusterCreatedAt.toLocalDate().isBefore(now.toLocalDate())) {
-                totalClusterRuntime += Duration.between(now.toLocalDate().atStartOfDay(), now).toMinutes(); // 오늘 정각부터 현재 시간까지
+                totalClusterRuntime += Duration.between(now.toLocalDate().atStartOfDay(), now)
+                    .toMinutes(); // 오늘 정각부터 현재 시간까지
             } else {
-                totalClusterRuntime += Duration.between(clusterCreatedAt, now).toMinutes(); // 생성 시간부터 현재 시간까지
+                totalClusterRuntime += Duration.between(clusterCreatedAt, now)
+                    .toMinutes(); // 생성 시간부터 현재 시간까지
             }
         }
 
         double realTimeRuntimeCost = totalClusterRuntime * 80;
 
-        double realTimeTotalCost = realTimeCpuCost + realTimeMemoryCost + realTimePodCost + realTimeRuntimeCost;
-
+        double realTimeTotalCost =
+            realTimeCpuCost + realTimeMemoryCost + realTimePodCost + realTimeRuntimeCost;
 
         UserUsageBillDto realTimeBill = UserUsageBillDto.builder()
-                .date(LocalDate.now().toString())
-                .totalCpuUsage(realTimeUsage.cpuUsage())
-                .totalCpuCost(realTimeCpuCost)
-                .totalMemoryUsage(realTimeUsage.memoryUsage())
-                .totalMemoryCost(realTimeMemoryCost)
-                .totalPodUsage(realTimeUsage.podUsage())
-                .totalPodCost(realTimePodCost)
-                .totalClusterRuntime(totalClusterRuntime)
-                .totalClusterRuntimeCost(realTimeRuntimeCost)
-                .totalCost(realTimeTotalCost)
-                .build();
+            .date(LocalDate.now().toString())
+            .totalCpuUsage(realTimeUsage.cpuUsage())
+            .totalCpuCost(realTimeCpuCost)
+            .totalMemoryUsage(realTimeUsage.memoryUsage())
+            .totalMemoryCost(realTimeMemoryCost)
+            .totalPodUsage(realTimeUsage.podUsage())
+            .totalPodCost(realTimePodCost)
+            .totalClusterRuntime(totalClusterRuntime)
+            .totalClusterRuntimeCost(realTimeRuntimeCost)
+            .totalCost(realTimeTotalCost)
+            .build();
 
         usageBills.add(0, realTimeBill); // 실시간 데이터 맨 앞으로
 
