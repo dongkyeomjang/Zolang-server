@@ -21,6 +21,6 @@ public class GradleBuildTool implements BuildTool {
 
     @Override
     public String build(String repoDir) throws IOException, InterruptedException, ExecutionException {
-        return "cd " + repoDir + " && ./gradlew build -x test";
+        return "cd " + repoDir + " && chmod +x ./gradlew && ./gradlew build -x test";
     }
 }

@@ -41,20 +41,28 @@ public class CICD {
     @Column(name = "z_trigger", nullable = false)
     private String trigger;
 
+    @Column(name = "port", nullable = false)
+    private Integer port;
+
+    @Column(name = "service_domain", nullable = true)
+    private String serviceDomain;
+
     @CreatedDate
     @Column(name = "created_at", nullable = false)
     private LocalDateTime createdAt;
 
     @Builder
-    public CICD(User user, String repositoryName, String branch, String language, String languageVersion, String buildTool, String trigger) {
+    public CICD(User user, String repositoryName, String branch, String language, String languageVersion, String buildTool, String trigger, Integer port, String serviceDomain) {
         this.user = user;
         this.repositoryName = repositoryName;
         this.createdAt = LocalDateTime.now();
         this.branch = branch;
         this.language = language;
-        this.languageVersion = languageVersion;
-        this.buildTool = buildTool;
+        this.languageVersion = (languageVersion != null) ? languageVersion : "none";
+        this.buildTool = (buildTool != null) ? buildTool : "none";
         this.trigger = trigger;
+        this.port = port;
+        this.serviceDomain = (serviceDomain != null) ? serviceDomain : "none";
     }
 
     public void update(String repositoryName) {

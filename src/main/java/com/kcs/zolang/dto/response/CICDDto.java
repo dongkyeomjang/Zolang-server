@@ -12,6 +12,9 @@ public record CICDDto(
         String lastCommit,
         String lastBuildStatus,
         String buildTool,
+        String trigger,
+        Integer port,
+        String serviceDomain,
         LocalDateTime createdAt
 ) {
     public static CICDDto fromEntity(CICD cicd, Build lastBuild) {
@@ -21,6 +24,8 @@ public record CICDDto(
                 .lastCommit(lastBuild.getLastCommitMessage())
                 .lastBuildStatus(lastBuild.getBuildStatus())
                 .buildTool(cicd.getBuildTool())
+                .port(cicd.getPort())
+                .serviceDomain(cicd.getServiceDomain())
                 .createdAt(cicd.getCreatedAt())
                 .build();
     }

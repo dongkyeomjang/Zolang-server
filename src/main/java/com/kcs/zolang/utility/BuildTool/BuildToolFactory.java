@@ -10,10 +10,12 @@ public class BuildToolFactory {
                 return new GradleBuildTool();
             case "maven":
                 return new MavenBuildTool();
-            case "python":
+            case "none":
                 return new PythonBuildTool();
-            case "nodejs":
-                return new NodeJsBuildTool();
+            case "npm":
+                return new NpmBuildTool();
+            case "yarn":
+                return new YarnBuildTool();
             case "AUTO":
                 if (new File(repoDir + "/gradlew").exists()) {
                     return new GradleBuildTool();
@@ -22,7 +24,11 @@ public class BuildToolFactory {
                 } else if (new File(repoDir + "/requirements.txt").exists()) {
                     return new PythonBuildTool();
                 } else if (new File(repoDir + "/package.json").exists()) {
-                    return new NodeJsBuildTool();
+                    if (new File(repoDir + "/yarn.lock").exists()) {
+                        return new YarnBuildTool();
+                    } else {
+                        return new NpmBuildTool();
+                    }
                 } else {
                     throw new RuntimeException("No supported build tool found in the repository");
                 }
