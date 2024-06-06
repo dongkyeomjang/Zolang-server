@@ -20,6 +20,10 @@ public record CICDRequestDto(
         @JsonProperty("envVars")
         List<EnvVarDto> envVars,
         @JsonProperty("trigger")
-        List<String> trigger
+        List<String> trigger,
+        @JsonProperty("port")
+        Integer port,
+        @JsonProperty("service_domain")
+        String serviceDomain
 ) {
 }
