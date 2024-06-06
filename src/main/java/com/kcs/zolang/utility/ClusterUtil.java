@@ -76,8 +76,9 @@ public class ClusterUtil {
             if (exitCode != 0) {
                 throw new RuntimeException("Failed to update kubeconfig");
             }
-
             log.info("Kubeconfig updated successfully");
+            // 인그레스 컨트롤러 설치
+            installIngressController();
         } catch (IOException | InterruptedException e) {
             log.error("Exception occurred while updating kubeconfig", e);
             throw new RuntimeException("Failed to update kubeconfig", e);
@@ -245,6 +246,19 @@ public class ClusterUtil {
         });
 
         return future;
+    }
+
+    public void installIngressController() {
+        try {
+            String command = "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && " +
+                    "helm repo update && " +
+                    "helm install ingress-nginx ingress-nginx/ingress-nginx --namespace ingress-nginx --create-namespace";
+            executeCommand(command);
+            log.info("NGINX Ingress Controller installed successfully");
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            log.error("Exception occurred while installing NGINX Ingress Controller", e);
+            throw new RuntimeException("Failed to install NGINX Ingress Controller", e);
+        }
     }
 
     private String generateDeploymentYaml(String repoName, List<EnvironmentVariable> environmentVariables) {
