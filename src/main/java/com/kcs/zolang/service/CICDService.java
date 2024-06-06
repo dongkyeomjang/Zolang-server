@@ -90,6 +90,8 @@ public class CICDService {
                     .languageVersion(requestDto.version() != null ? requestDto.version() : "none")
                     .buildTool(requestDto.buildTool() != null ? requestDto.buildTool() : "none")
                     .trigger(String.join(",", requestDto.trigger()))
+                    .port(requestDto.port())
+                    .serviceDomain(requestDto.serviceDomain() != null ? requestDto.serviceDomain() : "none")
                     .build();
             cicdRepository.save(cicd);
             if(requestDto.envVars() != null && !requestDto.envVars().isEmpty()){
