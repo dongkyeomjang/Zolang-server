@@ -39,9 +39,11 @@ public record ControllerCronJobDto(
             .suspend(cronJob.getSpec().getSuspend() != null && cronJob.getSpec().getSuspend())
             .active(cronJob.getStatus().getActive() == null ? 0
                 : cronJob.getStatus().getActive().size())
-            .lastScheduling(getAge(cronJob.getStatus().getLastScheduleTime().toLocalDateTime()))
+            .lastScheduling(
+                getAge(cronJob.getStatus().getLastScheduleTime() == null ? null
+                    : cronJob.getStatus().getLastScheduleTime().toLocalDateTime()))
             .lastScheduleDateTime(
-                cronJob.getStatus().getLastScheduleTime().toLocalDateTime() == null ? null
+                cronJob.getStatus().getLastScheduleTime() == null ? null
                     : cronJob.getStatus().getLastScheduleTime().toLocalDateTime().format(
                         DATE_TIME_FORMATTER))
             .age(getAge(Objects.requireNonNull(cronJob.getMetadata().getCreationTimestamp())
