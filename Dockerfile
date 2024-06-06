@@ -40,6 +40,9 @@ RUN mkdir -p ~/.docker/cli-plugins/ && \
     docker buildx create --use --name mybuilder && \
     docker buildx inspect --bootstrap
 
+# Helm 설치
+RUN curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash
+
 ARG JAR_PATH=./build/libs
 
 COPY ${JAR_PATH}/Zolang-server-0.0.1-SNAPSHOT.jar ./app.jar
