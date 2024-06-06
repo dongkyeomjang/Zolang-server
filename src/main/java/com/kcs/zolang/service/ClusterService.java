@@ -294,7 +294,7 @@ public class ClusterService {
                         clusterRepository.save(cluster);
                     } // creating(생성중) 상태 클러스터는 상태 업데함트 안함
                 })
-                .map(ClusterListDto::fromEntity)
+                .map(ClusterListDto::fromEntityAddHttps)
                 .toList();
     }
     //노드 사용량

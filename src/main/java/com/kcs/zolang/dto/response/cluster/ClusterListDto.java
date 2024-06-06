@@ -22,4 +22,14 @@ public record ClusterListDto(
                 .provider(cluster.getProvider())
                 .build();
     }
+    public static ClusterListDto fromEntityAddHttps(Cluster cluster) {
+        return ClusterListDto.builder()
+                .clusterId(cluster.getId())
+                .clusterName(cluster.getClusterName())
+                .domainUrl("https://" + cluster.getDomainUrl())
+                .status(cluster.getStatus())
+                .version(cluster.getVersion())
+                .provider(cluster.getProvider())
+                .build();
+    }
 }
