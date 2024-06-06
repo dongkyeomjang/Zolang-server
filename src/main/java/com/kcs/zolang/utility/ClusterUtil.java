@@ -1,9 +1,7 @@
 package com.kcs.zolang.utility;
 
 import com.kcs.zolang.domain.Cluster;
-import com.kcs.zolang.domain.CICD;
 import com.kcs.zolang.domain.EnvironmentVariable;
-import com.kcs.zolang.domain.User;
 import com.kcs.zolang.dto.response.CICDDto;
 import com.kcs.zolang.dto.response.UserCICDDto;
 import com.kcs.zolang.exception.CommonException;
@@ -13,10 +11,8 @@ import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.Configuration;
 import io.kubernetes.client.openapi.apis.AppsV1Api;
 import io.kubernetes.client.openapi.apis.CoreV1Api;
-import io.kubernetes.client.openapi.models.V1ConfigMap;
-import io.kubernetes.client.openapi.models.V1Deployment;
-import io.kubernetes.client.openapi.models.V1Pod;
-import io.kubernetes.client.openapi.models.V1Service;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api;
+import io.kubernetes.client.openapi.models.*;
 import io.kubernetes.client.util.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -131,6 +127,9 @@ public class ClusterUtil {
                     "- apiGroups: [\"metrics.k8s.io\"]\n" +
                     "  resources: [\"pods\", \"services\", \"deployments\", \"configmaps\", \"secrets\", \"networkpolicies\", \"nodes\",\"namespaces\"]\n" +
                     "  verbs: [\"get\", \"list\", \"watch\"]\n" +
+                    "- apiGroups: [\"networking.k8s.io\"]\n" +
+                    "  resources: [\"ingresses\", \"ingressclasses\"]\n" +
+                    "  verbs: [\"get\", \"list\", \"watch\",\"create\",\"update\",\"delete\"]\n" +
                     "EOF", roleName);
             log.info("Executing command: {}", roleCommand);
 
@@ -171,22 +170,6 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to get service account token with kubectl", e);
         }
     }
-    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables) {
-        ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
-        Configuration.setDefaultApiClient(client);
-        AppsV1Api api = new AppsV1Api();
-
-        // Deployment 삭제
-        api.deleteNamespacedDeployment(repoName, "default");
-        log.info("Deleted existing deployment: {}", repoName);
-
-        // 새로운 Deployment 생성
-        String deploymentYaml = generateDeploymentYaml(repoName, environmentVariables);
-        applyYamlToCluster(deploymentYaml, cluster);
-        log.info("Applied new deployment: {}", repoName);
-
-    }
-
     @Async("taskExecutor")
     public CompletableFuture<Void> runPipeline(CICDDto cicdDto, List<EnvironmentVariable> environmentVariables, Cluster cluster, UserCICDDto userCICDDto, Boolean isFirstRun) {
         CompletableFuture<Void> future = new CompletableFuture<>();
@@ -199,7 +182,7 @@ public class ClusterUtil {
 
                 executeCommand(String.format("cd /app/resources/repo && git clone %s %s", repoUrl, repoDir));
 
-                BuildTool buildTool = null;
+                BuildTool buildTool;
 
                 if(cicdDto.buildTool()==null){ // python일 경우
                     buildTool = BuildToolFactory.detectBuildTool(repoDir, "none");
@@ -233,9 +216,10 @@ public class ClusterUtil {
                 executeCommand(String.format("cd %s && docker buildx build --platform linux/arm64 -t %s --push .", repoDir, imageName));
 
                 if (isFirstRun) {
-                    applyYamlToCluster(generateDeploymentYaml(repoName, environmentVariables), cluster);
+                    String firstYaml = generateYaml(repoName, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
+                    applyYamlToCluster(firstYaml, cluster);
                 } else {
-                    rolloutDeployment(repoName, cluster, environmentVariables);
+                    rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
                 }
                 executeCommand(String.format("rm -rf %s", repoDir));
                 future.complete(null);
@@ -261,7 +245,7 @@ public class ClusterUtil {
         }
     }
 
-    private String generateDeploymentYaml(String repoName, List<EnvironmentVariable> environmentVariables) {
+    private String generateYaml(String repoName, List<EnvironmentVariable> environmentVariables, Integer port, String serviceDomain) {
         StringBuilder envVarsBuilder = new StringBuilder();
         if (environmentVariables != null && !environmentVariables.isEmpty()) {
             envVarsBuilder.append("        env:\n");
@@ -272,10 +256,9 @@ public class ClusterUtil {
             }
         }
 
-        String deploymentName = repoName;
         String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
                 awsAccountId, awsRegion, ecrRepositoryPrefix, repoName);
-        return String.format(
+        String deploymentYaml = String.format(
                 "apiVersion: apps/v1\n" +
                         "kind: Deployment\n" +
                         "metadata:\n" +
@@ -295,39 +278,148 @@ public class ClusterUtil {
                         "      - name: %s\n" +
                         "        image: %s\n" +
                         "        ports:\n" +
-                        "        - containerPort: 8080\n" +
+                        "        - containerPort: %d\n" +
                         "%s",
-                deploymentName, deploymentName, deploymentName, deploymentName, imageName, envVarsBuilder.toString());
-    }
-    private String generateKubeConfig(Cluster cluster) {
-        return String.format(
+                repoName, repoName, repoName, repoName, imageName, port, envVarsBuilder.toString());
+
+        String serviceYaml = String.format(
                 "apiVersion: v1\n" +
-                        "clusters:\n" +
-                        "- cluster:\n" +
-                        "    server: %s\n" +
-                        "  name: %s\n" +
-                        "contexts:\n" +
-                        "- context:\n" +
-                        "    cluster: %s\n" +
-                        "    user: %s\n" +
-                        "  name: %s\n" +
-                        "current-context: %s\n" +
-                        "kind: Config\n" +
-                        "preferences: {}\n" +
-                        "users:\n" +
-                        "- name: %s\n" +
-                        "  user:\n" +
-                        "    token: %s\n",
-                cluster.getDomainUrl(),
-                cluster.getClusterName(),
-                cluster.getClusterName(),
-                cluster.getClusterName(),
-                cluster.getClusterName(),
-                cluster.getClusterName(),
-                cluster.getClusterName(),
-                cluster.getSecretToken()
-        );
+                        "kind: Service\n" +
+                        "metadata:\n" +
+                        "  name: %s-service\n" +
+                        "  namespace: default\n" +
+                        "spec:\n" +
+                        "  type: LoadBalancer\n" +
+                        "  ports:\n" +
+                        "  - port: 80\n" +
+                        "    targetPort: %d\n" +
+                        "  selector:\n" +
+                        "    app: %s\n",
+                repoName, port, repoName);
+
+        String ingressYaml = "";
+        if (!serviceDomain.equals("none")) {
+            ingressYaml = String.format(
+                    "apiVersion: networking.k8s.io/v1\n" +
+                            "kind: Ingress\n" +
+                            "metadata:\n" +
+                            "  name: %s-ingress\n" +
+                            "  namespace: default\n" +
+                            "  annotations:\n" +
+                            "    nginx.ingress.kubernetes.io/rewrite-target: /\n" +
+                            "spec:\n" +
+                            "  rules:\n" +
+                            "  - host: %s\n" +
+                            "    http:\n" +
+                            "      paths:\n" +
+                            "      - path: /\n" +
+                            "        pathType: Prefix\n" +
+                            "        backend:\n" +
+                            "          service:\n" +
+                            "            name: %s-service\n" +
+                            "            port:\n" +
+                            "              number: 80\n",
+                    repoName, serviceDomain, repoName);
+        }
+        return deploymentYaml + "\n---\n" + serviceYaml + (ingressYaml.isEmpty() ? "" : "\n---\n" + ingressYaml);
     }
+    private void applyYamlToCluster(String yaml, Cluster cluster) {
+        log.info("Applying YAML to cluster: {}", yaml);
+        try {
+            // YAML 파일을 읽어서 여러 개의 Kubernetes 리소스 객체로 변환
+            List<Object> resources = io.kubernetes.client.util.Yaml.loadAll(yaml);
+            ApiClient client = Config.fromToken("https://" + cluster.getDomainUrl(), cluster.getSecretToken(),false);
+            Configuration.setDefaultApiClient(client);
+
+            // 각 리소스 객체를 적절한 API를 사용하여 Kubernetes 클러스터에 적용
+            for (Object resource : resources) {
+                if (resource instanceof V1Deployment deployment) {
+                    AppsV1Api appsV1Api = new AppsV1Api();
+                    AppsV1Api.APIcreateNamespacedDeploymentRequest request = appsV1Api.createNamespacedDeployment("default", deployment);
+                    request.execute();
+                } else if (resource instanceof V1Service service) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    CoreV1Api.APIcreateNamespacedServiceRequest request = coreV1Api.createNamespacedService("default", service);
+                    request.execute();
+                } else if (resource instanceof V1Ingress ingress) {
+                    NetworkingV1Api networkingV1Api = new NetworkingV1Api();
+                    NetworkingV1Api.APIcreateNamespacedIngressRequest request = networkingV1Api.createNamespacedIngress("default", ingress);
+                    request.execute();
+                }
+                else if (resource instanceof V1Pod pod) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    CoreV1Api.APIcreateNamespacedPodRequest request = coreV1Api.createNamespacedPod("default", pod);
+                    request.execute();
+                } else if (resource instanceof V1ConfigMap configMap) {
+                    CoreV1Api coreV1Api = new CoreV1Api();
+                    CoreV1Api.APIcreateNamespacedConfigMapRequest request = coreV1Api.createNamespacedConfigMap("default", configMap);
+                    request.execute();
+                }
+                else {
+                    throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
+                }
+            }
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables, Integer port, String serviceDomain) {
+        ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
+        Configuration.setDefaultApiClient(client);
+        AppsV1Api appsV1Api = new AppsV1Api();
+        CoreV1Api coreV1Api = new CoreV1Api();
+        NetworkingV1Api networkingV1Api = new NetworkingV1Api();
+
+        // Deployment 삭제
+        appsV1Api.deleteNamespacedDeployment(repoName, "default");
+        log.info("Deleted existing deployment: {}", repoName);
+        coreV1Api.deleteNamespacedService(repoName + "-service", "default");
+        log.info("Deleted existing service: {}", repoName);
+        if(!serviceDomain.equals("none")) {
+            networkingV1Api.deleteNamespacedIngress(repoName + "-ingress", "default");
+            log.info("Deleted existing ingress: {}", repoName);
+        }
+
+        // 새로운 yaml그룹 생성
+        String newYaml = generateYaml(repoName, environmentVariables, port, serviceDomain);
+        applyYamlToCluster(newYaml, cluster);
+        log.info("Applied new deployment: {}", repoName);
+
+    }
+
+    private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException, ExecutionException {
+        String checkRepoExistsCommand = String.format("aws ecr describe-repositories --repository-names %s --region %s", repoName, awsRegion);
+        log.info("Executing command: {}", checkRepoExistsCommand);
+        String createRepoCommand = String.format("aws ecr create-repository --repository-name %s --region %s", repoName, awsRegion);
+        log.info("Executing command: {}", createRepoCommand);
+
+        Process process = Runtime.getRuntime().exec(checkRepoExistsCommand);
+        process.waitFor();
+        if (process.exitValue() != 0) {
+            executeCommand(createRepoCommand);
+        }
+    }
+
+    public void installAndConfigureMetricsServer() {
+        try {
+            String applyCommand = "kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml";
+            log.info("Executing command: {}", applyCommand);
+            executeCommand(applyCommand);
+
+            String patchCommand = "kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{" +
+                    "\"op\": \"add\", \"path\": \"/spec/template/spec/containers/0/args/-\", \"value\": \"--kubelet-insecure-tls\"}," +
+                    "{\"op\": \"add\", \"path\": \"/spec/template/spec/hostNetwork\", \"value\": true}]'";
+            log.info("Executing command: {}", patchCommand);
+            executeCommand(patchCommand);
+
+            log.info("Metrics Server installed and configured successfully");
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            log.error("Exception occurred while installing and configuring metrics-server", e);
+            throw new RuntimeException("Failed to install and configure metrics-server", e);
+        }
+    }
+
     private void executeCommand(String command) throws IOException, InterruptedException, ExecutionException {
         log.info("Executing command: {}", command);
         ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
@@ -392,72 +484,5 @@ public class ClusterUtil {
             throw new RuntimeException("Command failed: " + command);
         }
         return output.toString().trim();
-    }
-    private void applyYamlToCluster(String yaml, Cluster cluster) {
-        try {
-            // YAML 파일을 읽어서 여러 개의 Kubernetes 리소스 객체로 변환
-            List<Object> resources = io.kubernetes.client.util.Yaml.loadAll(yaml);
-            ApiClient client = Config.fromToken("https://" + cluster.getDomainUrl(), cluster.getSecretToken(),false);
-            Configuration.setDefaultApiClient(client);
-
-            // 각 리소스 객체를 적절한 API를 사용하여 Kubernetes 클러스터에 적용
-            for (Object resource : resources) {
-                if (resource instanceof V1Deployment) {
-                    V1Deployment deployment = (V1Deployment) resource;
-                    AppsV1Api appsV1Api = new AppsV1Api();
-                    AppsV1Api.APIcreateNamespacedDeploymentRequest request = appsV1Api.createNamespacedDeployment("default", deployment);
-                    request.execute();
-                } else if (resource instanceof V1Service service) {
-                    CoreV1Api coreV1Api = new CoreV1Api();
-                    CoreV1Api.APIcreateNamespacedServiceRequest request = coreV1Api.createNamespacedService("default", service);
-                    request.execute();
-                } else if (resource instanceof V1Pod pod) {
-                    CoreV1Api coreV1Api = new CoreV1Api();
-                    CoreV1Api.APIcreateNamespacedPodRequest request = coreV1Api.createNamespacedPod("default", pod);
-                    request.execute();
-                } else if (resource instanceof V1ConfigMap configMap) {
-                    CoreV1Api coreV1Api = new CoreV1Api();
-                    CoreV1Api.APIcreateNamespacedConfigMapRequest request = coreV1Api.createNamespacedConfigMap("default", configMap);
-                    request.execute();
-                }
-                else {
-                    throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
-                }
-            }
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException, ExecutionException {
-        String checkRepoExistsCommand = String.format("aws ecr describe-repositories --repository-names %s --region %s", repoName, awsRegion);
-        log.info("Executing command: {}", checkRepoExistsCommand);
-        String createRepoCommand = String.format("aws ecr create-repository --repository-name %s --region %s", repoName, awsRegion);
-        log.info("Executing command: {}", createRepoCommand);
-
-        Process process = Runtime.getRuntime().exec(checkRepoExistsCommand);
-        process.waitFor();
-        if (process.exitValue() != 0) {
-            executeCommand(createRepoCommand);
-        }
-    }
-
-    public void installAndConfigureMetricsServer() {
-        try {
-            String applyCommand = "kubectl apply -f https://github.com/kubernetes-sigs/metrics-server/releases/latest/download/components.yaml";
-            log.info("Executing command: {}", applyCommand);
-            executeCommand(applyCommand);
-
-            String patchCommand = "kubectl patch deployment metrics-server -n kube-system --type='json' -p='[{" +
-                    "\"op\": \"add\", \"path\": \"/spec/template/spec/containers/0/args/-\", \"value\": \"--kubelet-insecure-tls\"}," +
-                    "{\"op\": \"add\", \"path\": \"/spec/template/spec/hostNetwork\", \"value\": true}]'";
-            log.info("Executing command: {}", patchCommand);
-            executeCommand(patchCommand);
-
-            log.info("Metrics Server installed and configured successfully");
-        } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing and configuring metrics-server", e);
-            throw new RuntimeException("Failed to install and configure metrics-server", e);
-        }
     }
 }
