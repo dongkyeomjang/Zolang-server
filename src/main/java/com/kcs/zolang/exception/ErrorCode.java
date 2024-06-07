@@ -38,6 +38,7 @@ public enum ErrorCode {
     BAD_REQUEST_JSON(40006, HttpStatus.BAD_REQUEST, "잘못된 JSON 형식입니다."),
     SEARCH_SHORT_LENGTH_ERROR(40007, HttpStatus.BAD_REQUEST, "검색어는 2글자 이상이어야 합니다."),
     INVALID_PAYLOAD(40008, HttpStatus.BAD_REQUEST, "유효하지 않은 페이로드입니다."),
+    INVALID_YAML(40009, HttpStatus.BAD_REQUEST, "유효하지 않은 YAML입니다."),
 
 
     // Access Denied Error
@@ -71,6 +72,14 @@ public enum ErrorCode {
     FAILED_DELETE_SERVICE(50009, HttpStatus.INTERNAL_SERVER_ERROR, "서비스 삭제에 실패하였습니다."),
     FAILED_DELETE_DEPLOYMENT(50010, HttpStatus.INTERNAL_SERVER_ERROR, "디플로이먼트 삭제에 실패하였습니다."),
     FAILED_DELETE_INGRESS(50011, HttpStatus.INTERNAL_SERVER_ERROR, "인그레스 삭제에 실패하였습니다."),
+    FAILED_CREATE_CERTIFICATE(50012, HttpStatus.INTERNAL_SERVER_ERROR, "인증서 생성에 실패하였습니다."),
+    FAILED_CREATE_KUBECONFIG(50013, HttpStatus.INTERNAL_SERVER_ERROR, "Kubeconfig 생성에 실패하였습니다."),
+    FAILED_CREATE_SA_ROLE_ROLEBINDING(50014, HttpStatus.INTERNAL_SERVER_ERROR, "ServiceAccount, Role, RoleBinding 생성에 실패하였습니다."),
+    FAILED_GET_SA_TOKEN(50015, HttpStatus.INTERNAL_SERVER_ERROR, "ServiceAccount 토큰 가져오기에 실패하였습니다."),
+    FAILED_INSTALL_INGRESS_CONTROLLER(50016, HttpStatus.INTERNAL_SERVER_ERROR, "인그레스 컨트롤러 설치에 실패하였습니다."),
+    FAILED_CREATE_CLUSTER_ISSUER(50017, HttpStatus.INTERNAL_SERVER_ERROR, "cluster issuer 생성에 실패하였습니다."),
+    FAILED_APPLY_YAML(50018, HttpStatus.INTERNAL_SERVER_ERROR, "YAML 적용에 실패하였습니다."),
+    FAILED_INSTALL_METRICS_SERVER(50019, HttpStatus.INTERNAL_SERVER_ERROR, "메트릭 서버 설치에 실패하였습니다."),
 
     // 개발자가 직접 정의한 에러
     ALREADY_EXIST_ZOLANG_CLUSTER(60000, HttpStatus.BAD_REQUEST, "Zolang에서 생성할 수 있는 클러스터는 최대 1개입니다.");
