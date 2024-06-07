@@ -237,6 +237,8 @@ public class CICDService {
     public void deleteRepository(Long userId, Long cicdId) {
         CICD cicd = cicdRepository.findById(cicdId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
+        List<Build> buildList = buildRepository.findByCICD(cicd);
+        buildRepository.deleteAll(buildList);
         if (!cicd.getUser().getId().equals(userId)) {
             throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
         }
