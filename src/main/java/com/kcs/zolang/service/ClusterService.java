@@ -25,9 +25,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.scheduling.annotation.Async;
 import org.springframework.stereotype.Service;
 import software.amazon.awssdk.services.ec2.Ec2Client;
-import software.amazon.awssdk.services.ec2.model.CreateLaunchTemplateRequest;
-import software.amazon.awssdk.services.ec2.model.CreateLaunchTemplateResponse;
-import software.amazon.awssdk.services.ec2.model.RequestLaunchTemplateData;
+import software.amazon.awssdk.services.ec2.model.*;
 import software.amazon.awssdk.services.eks.EksClient;
 import software.amazon.awssdk.services.eks.model.*;
 import java.io.IOException;
@@ -43,6 +41,7 @@ import io.kubernetes.client.openapi.apis.CoreV1Api;
 import io.kubernetes.client.openapi.models.V1Node;
 import io.kubernetes.client.openapi.models.V1NodeCondition;
 import io.kubernetes.client.openapi.models.V1NodeList;
+import software.amazon.awssdk.services.eks.model.LaunchTemplateSpecification;
 
 @Slf4j
 @Service
@@ -70,8 +69,8 @@ public class ClusterService {
     @Value("${aws.security-group.id-1}")
     private String securityGroupId1;
 
-    @Value("${aws.security-group.id-2}")
-    private String securityGroupId2;
+    @Value("${aws.vpc.id}")
+    private String vpcId;
 
     @Value("${aws.version}")
     private String version;
@@ -85,11 +84,18 @@ public class ClusterService {
     }
 
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
+        String userEmail;
         // 클러스터 상태를 'creating'으로 설정하고 DB에 저장
         clusterRepository.findByProviderAndUserId("zolang", userId)
                 .ifPresent(cluster -> {
                     throw new CommonException(ErrorCode.ALREADY_EXIST_ZOLANG_CLUSTER);
                 });
+        if(!(userRepository.findById(userId).get().getEmail() ==null)){
+            userEmail = userRepository.findById(userId).get().getEmail();
+        } else {
+            userEmail = "none";
+        }
+
         Cluster cluster = clusterRepository.save(
                 Cluster.builder()
                         .user(userRepository.findById(userId)
@@ -104,21 +110,22 @@ public class ClusterService {
         );
 
         // 비동기적으로 클러스터 생성
-        createClusterAsync(cluster.getId(), clusterName);
+        createClusterAsync(cluster.getId(), clusterName, userEmail);
 
         return ClusterCreateResponseDto.fromEntity(cluster);
     }
 
     @Async
-    public void createClusterAsync(Long clusterId, String clusterName) {
+    public void createClusterAsync(Long clusterId, String clusterName, String userEmail) {
         try {
+            tagSecurityGroup(clusterName, securityGroupId1);
             // 클러스터를 EKS에 생성
             CreateClusterRequest request = CreateClusterRequest.builder()
                     .name(clusterName)
                     .roleArn(eksRoleArn)
                     .resourcesVpcConfig(VpcConfigRequest.builder()
                             .subnetIds(subnetId1, subnetId2)
-                            .securityGroupIds(securityGroupId1, securityGroupId2)
+                            .securityGroupIds(securityGroupId1)
                             .endpointPublicAccess(true)
                             .endpointPrivateAccess(true)
                             .build())
@@ -143,7 +150,7 @@ public class ClusterService {
             // Kubeconfig 파일 생성 및 설정
             Cluster cluster = clusterRepository.findById(clusterId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-            clusterUtil.createKubeconfig(cluster);
+            clusterUtil.createKubeconfig(cluster,userEmail);
 
             // 서비스 계정 및 역할 생성
             clusterUtil.createServiceAccountWithKubectl(cluster);
@@ -201,13 +208,27 @@ public class ClusterService {
                         .imageId("ami-0d989729759ea3477")
                         .instanceType("t4g.medium")
                         .keyName("bongousse")
-                        .securityGroupIds(securityGroupId1, securityGroupId2)
+                        .securityGroupIds(securityGroupId1)
                         .userData(base64UserData)
                         .build())
                 .build();
 
         CreateLaunchTemplateResponse response = ec2Client.createLaunchTemplate(request);
         return response.launchTemplate().launchTemplateId();
+    }
+
+    private void tagSecurityGroup(String clusterName, String securityGroupId) {
+        Tag clusterTag = Tag.builder()
+                .key("kubernetes.io/cluster/" + clusterName)
+                .value("owned")
+                .build();
+
+        CreateTagsRequest createTagsRequest = CreateTagsRequest.builder()
+                .resources(securityGroupId)
+                .tags(clusterTag)
+                .build();
+
+        ec2Client.createTags(createTagsRequest);
     }
 
     private String getUserDataScript(String clusterName) {
