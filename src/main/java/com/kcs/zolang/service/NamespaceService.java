@@ -1,6 +1,8 @@
 package com.kcs.zolang.service;
 
 import com.kcs.zolang.dto.response.NamespaceCategoryDto;
+import com.kcs.zolang.exception.CommonException;
+import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.utility.MonitoringUtil;
 import io.kubernetes.client.openapi.ApiClient;
 import io.kubernetes.client.openapi.ApiException;
@@ -31,7 +33,7 @@ public class NamespaceService {
                     .map(NamespaceCategoryDto::fromEntity)
                     .collect(Collectors.toList());
         } catch (ApiException e) {
-            throw new RuntimeException(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 }
