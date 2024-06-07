@@ -35,38 +35,42 @@ public class GithubService {
     }
 
     public List<GitRepoDto> getRepositories(Long userId) {
-        String token = getUserGithubToken(userId);
-        List<GitRepoDto> allRepos = new ArrayList<>();
-        RestTemplate restTemplate = new RestTemplate();
-        String nextUrl = "https://api.github.com/user/repos";
+        try {
+            String token = getUserGithubToken(userId);
+            List<GitRepoDto> allRepos = new ArrayList<>();
+            RestTemplate restTemplate = new RestTemplate();
+            String nextUrl = "https://api.github.com/user/repos";
 
-        while (nextUrl != null) {
-            UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(nextUrl)
-                    .queryParam("per_page", 100);  // 최대 100개의 리포지토리를 페이지 당 요청
+            while (nextUrl != null) {
+                UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(nextUrl)
+                        .queryParam("per_page", 100);  // 최대 100개의 리포지토리를 페이지 당 요청
 
-            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                    builder.build().encode().toUri(),
-                    HttpMethod.GET,
-                    new HttpEntity<>(null, createHeaders(token)),
-                    (Class<List<Map<String, Object>>>)(Class<?>)List.class);
+                ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                        builder.build().encode().toUri(),
+                        HttpMethod.GET,
+                        new HttpEntity<>(null, createHeaders(token)),
+                        (Class<List<Map<String, Object>>>) (Class<?>) List.class);
 
-            List<Map<String, Object>> repos = response.getBody();
-            if (repos != null) {
-                allRepos.addAll(repos.stream()
-                        .filter(repo -> {
-                            Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
-                            return "User".equals(owner.get("type"));
-                        })
-                        .map(repo -> GitRepoDto.builder()
-                                .name(repo.get("name").toString())
-                                .branchesUrl(repo.get("branches_url").toString())
-                                .build())
-                        .toList());
+                List<Map<String, Object>> repos = response.getBody();
+                if (repos != null) {
+                    allRepos.addAll(repos.stream()
+                            .filter(repo -> {
+                                Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
+                                return "User".equals(owner.get("type"));
+                            })
+                            .map(repo -> GitRepoDto.builder()
+                                    .name(repo.get("name").toString())
+                                    .branchesUrl(repo.get("branches_url").toString())
+                                    .build())
+                            .toList());
+                }
+                nextUrl = getNextUrl(response.getHeaders());
             }
-            nextUrl = getNextUrl(response.getHeaders());
-        }
 
-        return allRepos;
+            return allRepos;
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
     }
 
     private String getNextUrl(HttpHeaders headers) {
