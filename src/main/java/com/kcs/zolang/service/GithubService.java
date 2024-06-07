@@ -84,30 +84,34 @@ public class GithubService {
     }
 
     public List<GitBranchDto> getBranches(Long userId, String repoName) {
-        String token = getUserGithubToken(userId);
-        String nickname = getUserNickname(userId);
+        try {
+            String token = getUserGithubToken(userId);
+            String nickname = getUserNickname(userId);
 
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl("https://api.github.com/repos/" + nickname + "/" + repoName + "/branches");
+            UriComponentsBuilder builder = UriComponentsBuilder
+                    .fromHttpUrl("https://api.github.com/repos/" + nickname + "/" + repoName + "/branches");
 
-        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                builder.build().encode().toUri(),
-                HttpMethod.GET,
-                new HttpEntity<>(null, createHeaders(token)),
-                (Class<List<Map<String, Object>>>)(Class<?>)List.class);
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    builder.build().encode().toUri(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(null, createHeaders(token)),
+                    (Class<List<Map<String, Object>>>) (Class<?>) List.class);
 
-        List<Map<String, Object>> branches = response.getBody();
-        return branches.stream()
-                .map(branch -> {
-                    Map<String, Object> commit = (Map<String, Object>) branch.get("commit");
-                    return GitBranchDto.builder()
-                            .name(branch.get("name").toString())
-                            .commitSha(commit.get("sha").toString())
-                            .commitsUrl(commit.get("url").toString())
-                            .isProtected(branch.get("protected").toString())
-                            .build();
-                })
-                .collect(Collectors.toList());
+            List<Map<String, Object>> branches = response.getBody();
+            return branches.stream()
+                    .map(branch -> {
+                        Map<String, Object> commit = (Map<String, Object>) branch.get("commit");
+                        return GitBranchDto.builder()
+                                .name(branch.get("name").toString())
+                                .commitSha(commit.get("sha").toString())
+                                .commitsUrl(commit.get("url").toString())
+                                .isProtected(branch.get("protected").toString())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
     }
 
     public Boolean createCommit(Long userId, String repoName, String branchName, CommitDto commitDto) {
