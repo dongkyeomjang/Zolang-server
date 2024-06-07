@@ -112,7 +112,7 @@ public class UserUsageService {
                     .count();
 
             } catch (ApiException e) {
-                throw new RuntimeException("API error", e);
+                throw new CommonException(ErrorCode.API_ERROR);
             }
         }
 
@@ -163,19 +163,14 @@ public class UserUsageService {
 
         // Usage 데이터 삭제
         usageRepository.deleteByCreatedAtBefore(thresholdDate);
-        log.info("usage 데이터 삭제 완:" + thresholdDate);
 
         // Bill 데이터 삭제
         List<Bill> oldBills = billRepository.findAllByDateBefore(thresholdDateString);
-        for (Bill bill : oldBills) {
-            billRepository.delete(bill);
-            log.info("bill 데이터 삭제 완: " + bill.getDate());
-        }
+        billRepository.deleteAll(oldBills);
     }
 
-    //정각마다 하루 전 cost 저장
     @Transactional
-    @Scheduled(cron = "0 0 0 * * *")
+    @Scheduled(cron = "0 0 0 * * *") // 정각마다 하루 전 cost 저장
     public void saveDailyBill() {
         LocalDateTime now = LocalDateTime.now();
         LocalDateTime startOfDay = now.minusDays(1).truncatedTo(ChronoUnit.DAYS);
@@ -230,7 +225,6 @@ public class UserUsageService {
                 .build();
 
             billRepository.save(bill);
-            log.info("하루치 bill 저장 완: " + user.getId());
         }
     }
 
@@ -246,7 +240,6 @@ public class UserUsageService {
 
         if (usages.isEmpty()) {
             // 전날 데이터 없는 경우 0으로
-            log.info("No usages found for user: {}", userId);
             return new UserUsageDto(
                 0.0,
                 0.0,
@@ -278,27 +271,27 @@ public class UserUsageService {
         int avgPodAllocatable = (int) usages.stream().mapToInt(Usage::getPodAllo).average()
             .orElse(0);
 
-        log.info("Avg CPU Usage: {}", avgCpuUsage);
-        log.info("Avg CPU Capacity: {}", avgCpuCapacity);
-        log.info("Avg CPU Allocatable: {}", avgCpuAllocatable);
-        log.info("Avg Memory Usage: {}", avgMemoryUsage);
-        log.info("Avg Memory Capacity: {}", avgMemoryCapacity);
-        log.info("Avg Memory Allocatable: {}", avgMemoryAllocatable);
-        log.info("Avg Pod Usage: {}", avgPodUsage);
-        log.info("Avg Pod Capacity: {}", avgPodCapacity);
-        log.info("Avg Pod Allocatable: {}", avgPodAllocatable);
+//        log.info("Avg CPU Usage: {}", avgCpuUsage);
+//        log.info("Avg CPU Capacity: {}", avgCpuCapacity);
+//        log.info("Avg CPU Allocatable: {}", avgCpuAllocatable);
+//        log.info("Avg Memory Usage: {}", avgMemoryUsage);
+//        log.info("Avg Memory Capacity: {}", avgMemoryCapacity);
+//        log.info("Avg Memory Allocatable: {}", avgMemoryAllocatable);
+//        log.info("Avg Pod Usage: {}", avgPodUsage);
+//        log.info("Avg Pod Capacity: {}", avgPodCapacity);
+//        log.info("Avg Pod Allocatable: {}", avgPodAllocatable);
 
-        return new UserUsageDto(
-            avgCpuUsage,
-            avgCpuAllocatable,
-            avgCpuCapacity,
-            avgMemoryUsage,
-            avgMemoryAllocatable,
-            avgMemoryCapacity,
-            avgPodUsage,
-            avgPodAllocatable,
-            avgPodCapacity
-        );
+        return UserUsageDto.builder()
+                .cpuUsage(avgCpuUsage)
+                .cpuAllocatable(avgCpuAllocatable)
+                .cpuCapacity(avgCpuCapacity)
+                .memoryUsage(avgMemoryUsage)
+                .memoryAllocatable(avgMemoryAllocatable)
+                .memoryCapacity(avgMemoryCapacity)
+                .podUsage(avgPodUsage)
+                .podAllocatable(avgPodAllocatable)
+                .podCapacity(avgPodCapacity)
+                .build();
     }
 
     //4일치 데이터 + 실시간 데이터 뽑기(Bill지 용)
