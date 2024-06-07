@@ -219,7 +219,7 @@ public class ClusterUtil {
                     applyYamlToCluster(firstYaml, cluster);
                     createCertificate(cicdDto.serviceDomain(), repoName, userCICDDto.email(), cluster);
                 } else {
-                    rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
+                    rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port());
                 }
                 executeCommand(String.format("rm -rf %s", repoDir));
                 future.complete(null);
@@ -394,6 +394,43 @@ public class ClusterUtil {
         }
         return deploymentYaml + "\n---\n" + serviceYaml + (ingressYaml.isEmpty() ? "" : "\n---\n" + ingressYaml);
     }
+    private String generateDeploymentYaml(String repoName, List<EnvironmentVariable> environmentVariables, Integer port) {
+        StringBuilder envVarsBuilder = new StringBuilder();
+        if (environmentVariables != null && !environmentVariables.isEmpty()) {
+            envVarsBuilder.append("        env:\n");
+            for (EnvironmentVariable environmentVariable : environmentVariables) {
+                envVarsBuilder.append(String.format(
+                        "        - name: %s\n" +
+                                "          value: %s\n", environmentVariable.getKey(), environmentVariable.getValue()));
+            }
+        }
+
+        String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
+                awsAccountId, awsRegion, ecrRepositoryPrefix, repoName);
+        return String.format(
+                "apiVersion: apps/v1\n" +
+                        "kind: Deployment\n" +
+                        "metadata:\n" +
+                        "  name: %s\n" +
+                        "  namespace: default\n" +
+                        "spec:\n" +
+                        "  replicas: 1\n" +
+                        "  selector:\n" +
+                        "    matchLabels:\n" +
+                        "      app: %s\n" +
+                        "  template:\n" +
+                        "    metadata:\n" +
+                        "      labels:\n" +
+                        "        app: %s\n" +
+                        "    spec:\n" +
+                        "      containers:\n" +
+                        "      - name: %s\n" +
+                        "        image: %s\n" +
+                        "        ports:\n" +
+                        "        - containerPort: %d\n" +
+                        "%s",
+                repoName, repoName, repoName, repoName, imageName, port, envVarsBuilder.toString());
+    }
     private void applyYamlToCluster(String yaml, Cluster cluster) {
         log.info("Applying YAML to cluster: {}", yaml);
         try {
@@ -435,25 +472,23 @@ public class ClusterUtil {
         }
     }
 
-    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables, Integer port, String serviceDomain) {
+    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables, Integer port) {
         ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
         Configuration.setDefaultApiClient(client);
         AppsV1Api appsV1Api = new AppsV1Api();
-        CoreV1Api coreV1Api = new CoreV1Api();
-        NetworkingV1Api networkingV1Api = new NetworkingV1Api();
 
         // Deployment 삭제
-        appsV1Api.deleteNamespacedDeployment(repoName, "default");
-        log.info("Deleted existing deployment: {}", repoName);
-        coreV1Api.deleteNamespacedService(repoName + "-service", "default");
-        log.info("Deleted existing service: {}", repoName);
-        if(!serviceDomain.equals("none")) {
-            networkingV1Api.deleteNamespacedIngress(repoName + "-ingress", "default");
-            log.info("Deleted existing ingress: {}", repoName);
+        AppsV1Api.APIdeleteNamespacedDeploymentRequest request = appsV1Api.deleteNamespacedDeployment(repoName, "default");
+        try{
+            request.execute();
+            log.info("Deleted existing deployment: {}", repoName);
+        } catch
+        (Exception e) {
+            log.error("Failed to delete deployment: {}", repoName);
         }
 
         // 새로운 yaml그룹 생성
-        String newYaml = generateYaml(repoName, environmentVariables, port, serviceDomain);
+        String newYaml = generateDeploymentYaml(repoName, environmentVariables, port);
         applyYamlToCluster(newYaml, cluster);
         log.info("Applied new deployment: {}", repoName);
 
