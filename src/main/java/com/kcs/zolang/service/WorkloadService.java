@@ -79,7 +79,7 @@ public class WorkloadService {
             return getCountWorkloadOverview(deployment, daemonSet, replicaSet, statefulSet,
                 cronJobList, jobList, podList);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -105,7 +105,7 @@ public class WorkloadService {
             return getCountWorkloadOverview(deployment, daemonSet, replicaSet, statefulSet,
                 cronJobList, jobList, podList);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -135,7 +135,7 @@ public class WorkloadService {
             return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
                 podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -166,7 +166,7 @@ public class WorkloadService {
             return PodListDto.fromEntity(totalUsage, podSimpleDtoList,
                 podList.getMetadata().getContinue(), startIndex, podNames.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -195,7 +195,7 @@ public class WorkloadService {
             }
             return PodDetailDto.fromEntity(pod, controlledDto, pvcDtoList, podUsage, volumes);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -219,7 +219,7 @@ public class WorkloadService {
                 deploymentList.getMetadata().getContinue(), startIndex, names.size());
 
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -231,7 +231,7 @@ public class WorkloadService {
             V1Deployment deployment = appsV1Api.readNamespacedDeployment(name, namespace).execute();
             return DeploymentDetailDto.fromEntity(deployment);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -255,7 +255,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 deploymentList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -279,7 +279,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 daemonSetList.getMetadata().getContinue(), startIndex, commonControllers.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -302,7 +302,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 daemonSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -322,7 +322,7 @@ public class WorkloadService {
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(daemonSet, podList, serviceList);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -344,7 +344,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -367,7 +367,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 replicaSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -387,7 +387,7 @@ public class WorkloadService {
                 namespaceName);
             return CommonControllerDetailDto.fromEntity(replicaSet, podList, serviceList);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -409,7 +409,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -431,7 +431,7 @@ public class WorkloadService {
             return CommonControllerListDto.fromEntity(commonControllers,
                 statefulSetList.getMetadata().getContinue(), startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -447,7 +447,7 @@ public class WorkloadService {
                 statefulSet.getKind());
             return CommonControllerDetailDto.fromEntity(statefulSet, pods);
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -469,7 +469,7 @@ public class WorkloadService {
             return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -491,7 +491,7 @@ public class WorkloadService {
             return CronJobListDto.fromEntity(cronJobs, cronJobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -512,7 +512,7 @@ public class WorkloadService {
             return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -534,7 +534,7 @@ public class WorkloadService {
             return JobListDto.fromEntity(jobSimpleDto, jobList.getMetadata().getContinue(),
                 startIndex, names.size());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -571,7 +571,7 @@ public class WorkloadService {
                         batchV1Api.readNamespacedJob(name, namespace).execute());
             }
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
         return null;
     }
@@ -646,7 +646,7 @@ public class WorkloadService {
             return PodPersistentVolumeClaimDto.fromEntity(
                 coreV1Api.readNamespacedPersistentVolumeClaim(name, namespace).execute());
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
     }
 
@@ -695,7 +695,7 @@ public class WorkloadService {
                 }
             }
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
         return getPodSimpleDtoList(clusterId, pods, m);
     }
@@ -718,7 +718,7 @@ public class WorkloadService {
                 }
             }
         } catch (ApiException e) {
-            throw getApiError(e);
+            throw new CommonException(ErrorCode.API_ERROR);
         }
         return services.stream().map(ServiceListDto::fromEntity).toList();
     }
