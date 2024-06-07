@@ -147,33 +147,37 @@ public class GithubService {
         if (!encodedContent.equals(existingContent)) {
             return updateFile(nickname, repoName, branchName, commitDto, encodedContent, sha, token);
         } else {
-            System.out.println("Nothing to update");
+            log.info("Nothing to update");
             return false;
         }
     }
 
     private Boolean createFile(String nickname, String repoName, String branchName, CommitDto commitDto, String token) {
-        String encodedContent = Base64.getEncoder().encodeToString(commitDto.content().getBytes());
-        String createUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
-        Map<String, Object> createRequest = Map.of(
-                "message", "create " + commitDto.fileName(),
-                "committer", Map.of(
-                        "name", commitDto.committerName(),
-                        "email", commitDto.committerEmail()
-                ),
-                "content", encodedContent,
-                "branch", branchName
-        );
+        try {
+            String encodedContent = Base64.getEncoder().encodeToString(commitDto.content().getBytes());
+            String createUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
+            Map<String, Object> createRequest = Map.of(
+                    "message", "create " + commitDto.fileName(),
+                    "committer", Map.of(
+                            "name", commitDto.committerName(),
+                            "email", commitDto.committerEmail()
+                    ),
+                    "content", encodedContent,
+                    "branch", branchName
+            );
 
-        HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, createHeaders(token));
+            HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, createHeaders(token));
 
-        ResponseEntity<Map> createResponse = restTemplate.exchange(
-                createUrl,
-                HttpMethod.PUT,
-                createEntity,
-                Map.class);
+            ResponseEntity<Map> createResponse = restTemplate.exchange(
+                    createUrl,
+                    HttpMethod.PUT,
+                    createEntity,
+                    Map.class);
 
-        return createResponse.getStatusCode().is2xxSuccessful();
+            return createResponse.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private Boolean updateFile(String nickname, String repoName, String branchName, CommitDto commitDto, String encodedContent, String sha, String token) {
@@ -195,7 +199,6 @@ public class GithubService {
             restTemplate.put(updateUrl, updateEntity);
             return true;
         } catch (HttpClientErrorException e) {
-            // 오류 응답 코드 처리
             return false;
         }
     }
