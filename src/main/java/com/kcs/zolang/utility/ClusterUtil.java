@@ -35,10 +35,12 @@ public class ClusterUtil {
     private String awsRegion;
     @Value("${aws.ecr.repository.prefix}")
     private String ecrRepositoryPrefix;
+    @Value("${email}")
+    private String email;
     private final JobQueueUtility jobQueueUtility;
     private final StringEncryptor stringEncryptor;
 
-    public void createKubeconfig(Cluster cluster) {
+    public void createKubeconfig(Cluster cluster, String userEmail) {
         String command = String.format("aws eks update-kubeconfig --name %s --region %s", cluster.getClusterName(), awsRegion);
 
         try {
@@ -75,6 +77,7 @@ public class ClusterUtil {
             log.info("Kubeconfig updated successfully");
             // 인그레스 컨트롤러 설치
             installIngressController();
+            installClusterIssuer(userEmail);
         } catch (IOException | InterruptedException e) {
             log.error("Exception occurred while updating kubeconfig", e);
             throw new RuntimeException("Failed to update kubeconfig", e);
@@ -232,7 +235,7 @@ public class ClusterUtil {
         return future;
     }
 
-    public void installIngressController() {
+    private void installIngressController() {
         try {
             String command = "helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx && " +
                     "helm repo update && " +
@@ -244,6 +247,42 @@ public class ClusterUtil {
             throw new RuntimeException("Failed to install NGINX Ingress Controller", e);
         }
     }
+    private void installClusterIssuer(String userEmail) {
+        try {
+            String installCertManagerCommand = """
+                    kubectl apply --validate=false -f https://github.com/jetstack/cert-manager/releases/download/v1.8.0/cert-manager.crds.yaml
+                    kubectl create namespace cert-manager
+                    helm repo add jetstack https://charts.jetstack.io
+                    helm repo update
+                    helm install cert-manager jetstack/cert-manager --namespace cert-manager --version v1.8.0""";
+            executeCommand(installCertManagerCommand);
+            if(userEmail.equals("none")) {
+                userEmail = email;
+            }
+            String command = String.format(
+                    "kubectl apply -f - <<EOF\n" +
+                            "apiVersion: cert-manager.io/v1\n" +
+                            "kind: ClusterIssuer\n" +
+                            "metadata:\n" +
+                            "  name: letsencrypt-prod\n" +
+                            "spec:\n" +
+                            "  acme:\n" +
+                            "    server: https://acme-v02.api.letsencrypt.org/directory\n" +
+                            "    email: %s\n" +
+                            "    privateKeySecretRef:\n" +
+                            "      name: letsencrypt-prod\n" +
+                            "    solvers:\n" +
+                            "    - http01:\n" +
+                            "        ingress:\n" +
+                            "          class: nginx\n" +
+                            "EOF", userEmail);
+            executeCommand(command);
+        } catch (IOException | InterruptedException | ExecutionException e) {
+            log.error("Exception occurred while installing ClusterIssuer", e);
+            throw new RuntimeException("Failed to install ClusterIssuer", e);
+        }
+    }
+
 
     private String generateYaml(String repoName, List<EnvironmentVariable> environmentVariables, Integer port, String serviceDomain) {
         StringBuilder envVarsBuilder = new StringBuilder();
@@ -308,6 +347,7 @@ public class ClusterUtil {
                             "  annotations:\n" +
                             "    nginx.ingress.kubernetes.io/rewrite-target: /\n" +
                             "spec:\n" +
+                            "  ingressClassName: nginx\n" +
                             "  rules:\n" +
                             "  - host: %s\n" +
                             "    http:\n" +
@@ -318,8 +358,12 @@ public class ClusterUtil {
                             "          service:\n" +
                             "            name: %s-service\n" +
                             "            port:\n" +
-                            "              number: 80\n",
-                    repoName, serviceDomain, repoName);
+                            "              number: 80\n" +
+                            "  tls:\n" +
+                            "  - hosts:\n" +
+                            "    - %s\n" +
+                            "    secretName: %s-tls\n",
+                    repoName, serviceDomain, repoName, serviceDomain, repoName);
         }
         return deploymentYaml + "\n---\n" + serviceYaml + (ingressYaml.isEmpty() ? "" : "\n---\n" + ingressYaml);
     }
