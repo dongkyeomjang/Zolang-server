@@ -12,6 +12,12 @@ import com.kcs.zolang.exception.CommonException;
 import com.kcs.zolang.exception.ErrorCode;
 import com.kcs.zolang.repository.*;
 import com.kcs.zolang.utility.ClusterUtil;
+import io.kubernetes.client.openapi.ApiClient;
+import io.kubernetes.client.openapi.Configuration;
+import io.kubernetes.client.openapi.apis.AppsV1Api;
+import io.kubernetes.client.openapi.apis.CoreV1Api;
+import io.kubernetes.client.openapi.apis.NetworkingV1Api;
+import io.kubernetes.client.util.Config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.jasypt.encryption.StringEncryptor;
@@ -235,13 +241,53 @@ public class CICDService {
     }
 
     public void deleteRepository(Long userId, Long cicdId) {
+        Cluster cluster = clusterRepository.findByProviderAndUserId("zolang", userId)
+                .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
+
+        ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
+        Configuration.setDefaultApiClient(client);
+
         CICD cicd = cicdRepository.findById(cicdId)
                 .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_REPOSITORY));
         List<Build> buildList = buildRepository.findByCICD(cicd);
+
+        String repoName = cicd.getRepositoryName().toLowerCase().replaceAll("[^a-zA-Z0-9]", "");
+
         buildRepository.deleteAll(buildList);
         if (!cicd.getUser().getId().equals(userId)) {
             throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
         }
         cicdRepository.delete(cicd);
+        CoreV1Api coreV1Api = new CoreV1Api();
+        CoreV1Api.APIdeleteNamespacedServiceRequest deleteServiceRequest = coreV1Api.deleteNamespacedService(repoName + "-service", "default");
+        // Service 삭제
+        try {
+            deleteServiceRequest.execute();
+            log.info("Service deleted: {}", repoName + "-service");
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.FAILED_DELETE_SERVICE);
+        }
+        AppsV1Api appsV1Api = new AppsV1Api();
+
+        // Deployment 삭제
+        AppsV1Api.APIdeleteNamespacedDeploymentRequest deleteDeploymentRequest = appsV1Api.deleteNamespacedDeployment(repoName, "default");
+        try{
+            deleteDeploymentRequest.execute();
+            log.info("Deleted existing deployment: {}", repoName);
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.FAILED_DELETE_DEPLOYMENT);
+        }
+
+        if (!cluster.getDomainUrl().equals("none")) {
+            // Ingress 삭제
+            try {
+                NetworkingV1Api networkingV1Api = new NetworkingV1Api();
+                NetworkingV1Api.APIdeleteNamespacedIngressRequest deleteIngressRequest = networkingV1Api.deleteNamespacedIngress(repoName + "-ingress", "default");
+                deleteIngressRequest.execute();
+            } catch (Exception e) {
+                throw new CommonException(ErrorCode.FAILED_DELETE_INGRESS);
+            }
+        }
+
     }
 }
