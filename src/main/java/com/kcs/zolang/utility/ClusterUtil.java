@@ -40,24 +40,18 @@ public class ClusterUtil {
     private final JobQueueUtility jobQueueUtility;
     private final StringEncryptor stringEncryptor;
 
-    public void createKubeconfig(Cluster cluster, String userEmail) {
+    public void createKubeconfig(Cluster cluster, String userEmail, Boolean isCreatingCluster) {
         String command = String.format("aws eks update-kubeconfig --name %s --region %s", cluster.getClusterName(), awsRegion);
 
         try {
-            log.info("createKubeconfig 진입");
             ProcessBuilder processBuilder = new ProcessBuilder("sh", "-c", command);
-            log.info("processBuilder 생성");
-            log.info("환경변수 설정 완료 AWS_ACCESS_KEY_ID : {}, AWS_SECRET_ACCESS : {}",System.getenv("AWS_ACCESS_KEY_ID"), System.getenv("AWS_SECRET_ACCESS_KEY"));
             processBuilder.environment().put("AWS_ACCESS_KEY_ID", System.getenv("AWS_ACCESS_KEY_ID"));
             processBuilder.environment().put("AWS_SECRET_ACCESS_KEY", System.getenv("AWS_SECRET_ACCESS_KEY"));
-            log.info("환경변수 설정 완료 AWS_ACCESS_KEY_ID : {}, AWS_SECRET_ACCESS : {}", System.getenv("AWS_ACCESS_KEY_ID"), System.getenv("AWS_SECRET_ACCESS_KEY"));
 
             Process process = processBuilder.start();
-            log.info("process 실행");
 
             // 표준 출력 읽기
             BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-            log.info("BufferedReader 생성 (stdout)");
             String line;
             while ((line = reader.readLine()) != null) {
                 log.info("stdout: {}", line);
@@ -65,7 +59,6 @@ public class ClusterUtil {
 
             // 에러 출력 읽기
             BufferedReader errorReader = new BufferedReader(new InputStreamReader(process.getErrorStream()));
-            log.info("BufferedReader 생성 (stderr)");
             while ((line = errorReader.readLine()) != null) {
                 log.error("stderr: {}", line);
             }
@@ -75,9 +68,12 @@ public class ClusterUtil {
                 throw new RuntimeException("Failed to update kubeconfig");
             }
             log.info("Kubeconfig updated successfully");
-            // 인그레스 컨트롤러 설치
-            installIngressController();
-            installClusterIssuer(userEmail);
+            if(isCreatingCluster) {
+                // 인그레스 컨트롤러 설치
+                installIngressController();
+                // ClusterIssuer 생성
+                installClusterIssuer(userEmail);
+            }
         } catch (IOException | InterruptedException e) {
             log.error("Exception occurred while updating kubeconfig", e);
             throw new RuntimeException("Failed to update kubeconfig", e);
@@ -221,6 +217,7 @@ public class ClusterUtil {
                 if (isFirstRun) {
                     String firstYaml = generateYaml(repoName, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
                     applyYamlToCluster(firstYaml, cluster);
+                    createCertificate(cicdDto.serviceDomain(), repoName, userCICDDto.email(), cluster);
                 } else {
                     rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
                 }
@@ -233,6 +230,36 @@ public class ClusterUtil {
         });
 
         return future;
+    }
+
+    private void createCertificate(String serviceDomain, String repoName, String userEmail, Cluster cluster) {
+        if(userEmail.equals("none")){
+            userEmail = email;
+        }
+        if(!serviceDomain.equals("none")) {
+            try {
+                createKubeconfig(cluster, userEmail, false);
+                String command = String.format(
+                        "kubectl apply -f - <<EOF\n" +
+                                "apiVersion: cert-manager.io/v1\n" +
+                                "kind: Certificate\n" +
+                                "metadata:\n" +
+                                "  name: %s-tls\n" +
+                                "  namespace: default\n" +
+                                "spec:\n" +
+                                "  secretName: %s-tls\n" +
+                                "  issuerRef:\n" +
+                                "    name: letsencrypt-prod\n" +
+                                "    kind: ClusterIssuer\n" +
+
+                                "  dnsNames:\n" +
+                                "  - %s", repoName, repoName, serviceDomain);
+                executeCommand(command);
+            } catch (IOException | InterruptedException | ExecutionException e) {
+                log.error("Exception occurred while creating certificate", e);
+                throw new RuntimeException("Failed to create certificate", e);
+            }
+        }
     }
 
     private void installIngressController() {

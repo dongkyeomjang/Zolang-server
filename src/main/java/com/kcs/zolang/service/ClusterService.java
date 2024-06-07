@@ -150,7 +150,7 @@ public class ClusterService {
             // Kubeconfig 파일 생성 및 설정
             Cluster cluster = clusterRepository.findById(clusterId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
-            clusterUtil.createKubeconfig(cluster,userEmail);
+            clusterUtil.createKubeconfig(cluster,userEmail, true);
 
             // 서비스 계정 및 역할 생성
             clusterUtil.createServiceAccountWithKubectl(cluster);
