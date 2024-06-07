@@ -75,8 +75,7 @@ public class ClusterUtil {
                 installClusterIssuer(userEmail);
             }
         } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while updating kubeconfig", e);
-            throw new RuntimeException("Failed to update kubeconfig", e);
+            throw new CommonException(ErrorCode.FAILED_CREATE_KUBECONFIG);
         }
     }
 
@@ -138,11 +137,8 @@ public class ClusterUtil {
             String roleBindingCommand = String.format("kubectl create clusterrolebinding %s --clusterrole=%s --serviceaccount=default:%s", roleBindingName, roleName, saName);
             log.info("Executing command: {}", roleBindingCommand);
             executeCommand(roleBindingCommand);
-        } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while creating service account and role with kubectl", e);
-            throw new RuntimeException("Failed to create service account and role with kubectl", e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
+        } catch (IOException | InterruptedException | ExecutionException e){
+            throw new CommonException(ErrorCode.FAILED_CREATE_SA_ROLE_ROLEBINDING);
         }
     }
 
@@ -165,8 +161,7 @@ public class ClusterUtil {
             log.info("Executing command: {}", getTokenCommand);
             return executeCommandAndGetOutput(getTokenCommand);
         } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while getting service account token with kubectl", e);
-            throw new RuntimeException("Failed to get service account token with kubectl", e);
+            throw new CommonException(ErrorCode.FAILED_GET_SA_TOKEN);
         }
     }
     @Async("taskExecutor")
@@ -256,8 +251,7 @@ public class ClusterUtil {
                                 "  - %s", repoName, repoName, serviceDomain);
                 executeCommand(command);
             } catch (IOException | InterruptedException | ExecutionException e) {
-                log.error("Exception occurred while creating certificate", e);
-                throw new RuntimeException("Failed to create certificate", e);
+                throw new CommonException(ErrorCode.FAILED_CREATE_CERTIFICATE);
             }
         }
     }
@@ -270,8 +264,7 @@ public class ClusterUtil {
             executeCommand(command);
             log.info("NGINX Ingress Controller installed successfully");
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing NGINX Ingress Controller", e);
-            throw new RuntimeException("Failed to install NGINX Ingress Controller", e);
+            throw new CommonException(ErrorCode.FAILED_INSTALL_INGRESS_CONTROLLER);
         }
     }
     private void installClusterIssuer(String userEmail) {
@@ -305,8 +298,7 @@ public class ClusterUtil {
                             "EOF", userEmail);
             executeCommand(command);
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing ClusterIssuer", e);
-            throw new RuntimeException("Failed to install ClusterIssuer", e);
+            throw new CommonException(ErrorCode.FAILED_CREATE_CLUSTER_ISSUER);
         }
     }
 
@@ -464,11 +456,11 @@ public class ClusterUtil {
                     request.execute();
                 }
                 else {
-                    throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
+                    throw new CommonException(ErrorCode.INVALID_YAML);
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new CommonException(ErrorCode.FAILED_APPLY_YAML);
         }
     }
 
@@ -491,7 +483,6 @@ public class ClusterUtil {
         String newYaml = generateDeploymentYaml(repoName, environmentVariables, port);
         applyYamlToCluster(newYaml, cluster);
         log.info("Applied new deployment: {}", repoName);
-
     }
 
     private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException, ExecutionException {
@@ -521,8 +512,7 @@ public class ClusterUtil {
 
             log.info("Metrics Server installed and configured successfully");
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing and configuring metrics-server", e);
-            throw new RuntimeException("Failed to install and configure metrics-server", e);
+            throw new CommonException(ErrorCode.FAILED_INSTALL_METRICS_SERVER);
         }
     }
 
