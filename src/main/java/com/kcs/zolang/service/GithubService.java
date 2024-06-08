@@ -35,51 +35,87 @@ public class GithubService {
     }
 
     public List<GitRepoDto> getRepositories(Long userId) {
-        String token = getUserGithubToken(userId);
+        try {
+            String token = getUserGithubToken(userId);
+            List<GitRepoDto> allRepos = new ArrayList<>();
+            RestTemplate restTemplate = new RestTemplate();
+            String nextUrl = "https://api.github.com/user/repos";
 
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl("https://api.github.com/user/repos");
+            while (nextUrl != null) {
+                UriComponentsBuilder builder = UriComponentsBuilder.fromHttpUrl(nextUrl)
+                        .queryParam("per_page", 100);  // 최대 100개의 리포지토리를 페이지 당 요청
 
-        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                builder.build().encode().toUri(),
-                HttpMethod.GET,
-                new HttpEntity<>(null, createHeaders(token)),
-                (Class<List<Map<String, Object>>>)(Class<?>)List.class);
+                ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                        builder.build().encode().toUri(),
+                        HttpMethod.GET,
+                        new HttpEntity<>(null, createHeaders(token)),
+                        (Class<List<Map<String, Object>>>) (Class<?>) List.class);
 
-        List<Map<String, Object>> repos = response.getBody();
-        return repos.stream()
-                .map(repo -> GitRepoDto.builder()
-                        .name(repo.get("name").toString())
-                        .branchesUrl(repo.get("branches_url").toString())
-                        .build())
-                .collect(Collectors.toList());
+                List<Map<String, Object>> repos = response.getBody();
+                if (repos != null) {
+                    allRepos.addAll(repos.stream()
+                            .filter(repo -> {
+                                Map<String, Object> owner = (Map<String, Object>) repo.get("owner");
+                                return "User".equals(owner.get("type"));
+                            })
+                            .map(repo -> GitRepoDto.builder()
+                                    .name(repo.get("name").toString())
+                                    .branchesUrl(repo.get("branches_url").toString())
+                                    .build())
+                            .toList());
+                }
+                nextUrl = getNextUrl(response.getHeaders());
+            }
+
+            return allRepos;
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
+    }
+
+    private String getNextUrl(HttpHeaders headers) {
+        List<String> links = headers.get(HttpHeaders.LINK);
+        if (links == null || links.isEmpty()) {
+            return null;
+        }
+
+        return Arrays.stream(links.get(0).split(","))
+                .map(String::trim)
+                .filter(link -> link.endsWith("rel=\"next\""))
+                .findFirst()
+                .map(link -> link.substring(link.indexOf('<') + 1, link.indexOf('>')))
+                .orElse(null);
     }
 
     public List<GitBranchDto> getBranches(Long userId, String repoName) {
-        String token = getUserGithubToken(userId);
-        String nickname = getUserNickname(userId);
+        try {
+            String token = getUserGithubToken(userId);
+            String nickname = getUserNickname(userId);
 
-        UriComponentsBuilder builder = UriComponentsBuilder
-                .fromHttpUrl("https://api.github.com/repos/" + nickname + "/" + repoName + "/branches");
+            UriComponentsBuilder builder = UriComponentsBuilder
+                    .fromHttpUrl("https://api.github.com/repos/" + nickname + "/" + repoName + "/branches");
 
-        ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
-                builder.build().encode().toUri(),
-                HttpMethod.GET,
-                new HttpEntity<>(null, createHeaders(token)),
-                (Class<List<Map<String, Object>>>)(Class<?>)List.class);
+            ResponseEntity<List<Map<String, Object>>> response = restTemplate.exchange(
+                    builder.build().encode().toUri(),
+                    HttpMethod.GET,
+                    new HttpEntity<>(null, createHeaders(token)),
+                    (Class<List<Map<String, Object>>>) (Class<?>) List.class);
 
-        List<Map<String, Object>> branches = response.getBody();
-        return branches.stream()
-                .map(branch -> {
-                    Map<String, Object> commit = (Map<String, Object>) branch.get("commit");
-                    return GitBranchDto.builder()
-                            .name(branch.get("name").toString())
-                            .commitSha(commit.get("sha").toString())
-                            .commitsUrl(commit.get("url").toString())
-                            .isProtected(branch.get("protected").toString())
-                            .build();
-                })
-                .collect(Collectors.toList());
+            List<Map<String, Object>> branches = response.getBody();
+            return branches.stream()
+                    .map(branch -> {
+                        Map<String, Object> commit = (Map<String, Object>) branch.get("commit");
+                        return GitBranchDto.builder()
+                                .name(branch.get("name").toString())
+                                .commitSha(commit.get("sha").toString())
+                                .commitsUrl(commit.get("url").toString())
+                                .isProtected(branch.get("protected").toString())
+                                .build();
+                    })
+                    .collect(Collectors.toList());
+        } catch (HttpClientErrorException.NotFound e) {
+            throw new CommonException(ErrorCode.NOT_FOUND_REPOSITORY);
+        }
     }
 
     public Boolean createCommit(Long userId, String repoName, String branchName, CommitDto commitDto) {
@@ -111,33 +147,37 @@ public class GithubService {
         if (!encodedContent.equals(existingContent)) {
             return updateFile(nickname, repoName, branchName, commitDto, encodedContent, sha, token);
         } else {
-            System.out.println("Nothing to update");
+            log.info("Nothing to update");
             return false;
         }
     }
 
     private Boolean createFile(String nickname, String repoName, String branchName, CommitDto commitDto, String token) {
-        String encodedContent = Base64.getEncoder().encodeToString(commitDto.content().getBytes());
-        String createUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
-        Map<String, Object> createRequest = Map.of(
-                "message", "create " + commitDto.fileName(),
-                "committer", Map.of(
-                        "name", commitDto.committerName(),
-                        "email", commitDto.committerEmail()
-                ),
-                "content", encodedContent,
-                "branch", branchName
-        );
+        try {
+            String encodedContent = Base64.getEncoder().encodeToString(commitDto.content().getBytes());
+            String createUrl = "https://api.github.com/repos/" + nickname + "/" + repoName + "/contents/" + commitDto.fileName();
+            Map<String, Object> createRequest = Map.of(
+                    "message", "create " + commitDto.fileName(),
+                    "committer", Map.of(
+                            "name", commitDto.committerName(),
+                            "email", commitDto.committerEmail()
+                    ),
+                    "content", encodedContent,
+                    "branch", branchName
+            );
 
-        HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, createHeaders(token));
+            HttpEntity<Map<String, Object>> createEntity = new HttpEntity<>(createRequest, createHeaders(token));
 
-        ResponseEntity<Map> createResponse = restTemplate.exchange(
-                createUrl,
-                HttpMethod.PUT,
-                createEntity,
-                Map.class);
+            ResponseEntity<Map> createResponse = restTemplate.exchange(
+                    createUrl,
+                    HttpMethod.PUT,
+                    createEntity,
+                    Map.class);
 
-        return createResponse.getStatusCode().is2xxSuccessful();
+            return createResponse.getStatusCode().is2xxSuccessful();
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private Boolean updateFile(String nickname, String repoName, String branchName, CommitDto commitDto, String encodedContent, String sha, String token) {
@@ -159,7 +199,6 @@ public class GithubService {
             restTemplate.put(updateUrl, updateEntity);
             return true;
         } catch (HttpClientErrorException e) {
-            // 오류 응답 코드 처리
             return false;
         }
     }

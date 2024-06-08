@@ -75,12 +75,17 @@ public class ClusterService {
     @Value("${aws.version}")
     private String version;
 
-    public String getVersion(ClusterVersionRequestDto clusterVersionRequestDto) throws ApiException {
-        ApiClient client = Config.fromToken("https://" + clusterVersionRequestDto.domainUrl(),
-                clusterVersionRequestDto.secretToken(), false);
-        Configuration.setDefaultApiClient(client);
-        VersionApi versionApi = new VersionApi(client);
-        return versionApi.getCode().execute().getGitVersion();
+    public String getVersion(ClusterVersionRequestDto clusterVersionRequestDto) {
+        try{
+            ApiClient client = Config.fromToken("https://" + clusterVersionRequestDto.domainUrl(),
+                    clusterVersionRequestDto.secretToken(), false);
+            Configuration.setDefaultApiClient(client);
+            VersionApi versionApi = new VersionApi(client);
+            return versionApi.getCode().execute().getGitVersion();
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.API_ERROR);
+        }
+
     }
 
     public ClusterCreateResponseDto createCluster(Long userId, String clusterName) {
@@ -169,33 +174,36 @@ public class ClusterService {
             clusterUtil.installAndConfigureMetricsServer();
 
         } catch (Exception e) {
-            log.error("Exception occurred while creating cluster asynchronously", e);
             Cluster cluster = clusterRepository.findById(clusterId)
                     .orElseThrow(() -> new CommonException(ErrorCode.NOT_FOUND_CLUSTER));
             clusterRepository.delete(cluster);
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
         }
     }
 
     private void createNodeGroup(String clusterName, String nodegroupName) {
         // 노드 그룹을 생성할 때 사용할 Launch Template 생성
         String launchTemplateId = createLaunchTemplate(clusterName);
-
-        CreateNodegroupRequest nodegroupRequest = CreateNodegroupRequest.builder()
-                .clusterName(clusterName)
-                .nodegroupName(nodegroupName)
-                .nodeRole(ec2RoleArn)
-                .subnets(subnetId1, subnetId2)
-                .launchTemplate(LaunchTemplateSpecification.builder()
-                        .id(launchTemplateId)
-                        .version("$Latest")
-                        .build())
-                .scalingConfig(NodegroupScalingConfig.builder()
-                        .minSize(2)
-                        .maxSize(2)
-                        .desiredSize(2)
-                        .build())
-                .build();
-        eksClient.createNodegroup(nodegroupRequest);
+        try {
+            CreateNodegroupRequest nodegroupRequest = CreateNodegroupRequest.builder()
+                    .clusterName(clusterName)
+                    .nodegroupName(nodegroupName)
+                    .nodeRole(ec2RoleArn)
+                    .subnets(subnetId1, subnetId2)
+                    .launchTemplate(LaunchTemplateSpecification.builder()
+                            .id(launchTemplateId)
+                            .version("$Latest")
+                            .build())
+                    .scalingConfig(NodegroupScalingConfig.builder()
+                            .minSize(2)
+                            .maxSize(2)
+                            .desiredSize(2)
+                            .build())
+                    .build();
+            eksClient.createNodegroup(nodegroupRequest);
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     private String createLaunchTemplate(String clusterName) {
@@ -218,17 +226,21 @@ public class ClusterService {
     }
 
     private void tagSecurityGroup(String clusterName, String securityGroupId) {
-        Tag clusterTag = Tag.builder()
-                .key("kubernetes.io/cluster/" + clusterName)
-                .value("owned")
-                .build();
+        try {
+            Tag clusterTag = Tag.builder()
+                    .key("kubernetes.io/cluster/" + clusterName)
+                    .value("owned")
+                    .build();
 
-        CreateTagsRequest createTagsRequest = CreateTagsRequest.builder()
-                .resources(securityGroupId)
-                .tags(clusterTag)
-                .build();
+            CreateTagsRequest createTagsRequest = CreateTagsRequest.builder()
+                    .resources(securityGroupId)
+                    .tags(clusterTag)
+                    .build();
 
-        ec2Client.createTags(createTagsRequest);
+            ec2Client.createTags(createTagsRequest);
+        } catch (Exception e) {
+            throw new CommonException(ErrorCode.INTERNAL_SERVER_ERROR);
+        }
     }
 
     private String getUserDataScript(String clusterName) {

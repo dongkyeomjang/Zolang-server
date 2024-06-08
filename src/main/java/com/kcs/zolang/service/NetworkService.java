@@ -12,15 +12,12 @@ import io.kubernetes.client.openapi.models.V1Service;
 import java.util.ArrayList;
 import java.util.List;
 import lombok.RequiredArgsConstructor;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 
 @Service
 @RequiredArgsConstructor
 public class NetworkService {
 
-    private static final Logger log = LoggerFactory.getLogger(NetworkService.class);
     private final MonitoringUtil monitoringUtil;
 
     public List<ServiceListDto> getServiceList(Long userId, Long clusterId) {
@@ -35,7 +32,6 @@ public class NetworkService {
             }
             return serviceListDtos;
         } catch (ApiException e) {
-            log.error("Error listing services: {}", e.getResponseBody(), e);
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }
@@ -51,7 +47,6 @@ public class NetworkService {
             }
             return serviceListDtos;
         } catch (ApiException e) {
-            log.error("Error listing services: {}", e.getResponseBody(), e);
             throw new CommonException(ErrorCode.API_ERROR);
         }
     }

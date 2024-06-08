@@ -75,8 +75,7 @@ public class ClusterUtil {
                 installClusterIssuer(userEmail);
             }
         } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while updating kubeconfig", e);
-            throw new RuntimeException("Failed to update kubeconfig", e);
+            throw new CommonException(ErrorCode.FAILED_CREATE_KUBECONFIG);
         }
     }
 
@@ -138,11 +137,8 @@ public class ClusterUtil {
             String roleBindingCommand = String.format("kubectl create clusterrolebinding %s --clusterrole=%s --serviceaccount=default:%s", roleBindingName, roleName, saName);
             log.info("Executing command: {}", roleBindingCommand);
             executeCommand(roleBindingCommand);
-        } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while creating service account and role with kubectl", e);
-            throw new RuntimeException("Failed to create service account and role with kubectl", e);
-        } catch (ExecutionException e) {
-            throw new RuntimeException(e);
+        } catch (IOException | InterruptedException | ExecutionException e){
+            throw new CommonException(ErrorCode.FAILED_CREATE_SA_ROLE_ROLEBINDING);
         }
     }
 
@@ -165,8 +161,7 @@ public class ClusterUtil {
             log.info("Executing command: {}", getTokenCommand);
             return executeCommandAndGetOutput(getTokenCommand);
         } catch (IOException | InterruptedException e) {
-            log.error("Exception occurred while getting service account token with kubectl", e);
-            throw new RuntimeException("Failed to get service account token with kubectl", e);
+            throw new CommonException(ErrorCode.FAILED_GET_SA_TOKEN);
         }
     }
     @Async("taskExecutor")
@@ -219,7 +214,7 @@ public class ClusterUtil {
                     applyYamlToCluster(firstYaml, cluster);
                     createCertificate(cicdDto.serviceDomain(), repoName, userCICDDto.email(), cluster);
                 } else {
-                    rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port(), cicdDto.serviceDomain());
+                    rolloutDeployment(repoName, cluster, environmentVariables, cicdDto.port());
                 }
                 executeCommand(String.format("rm -rf %s", repoDir));
                 future.complete(null);
@@ -256,8 +251,7 @@ public class ClusterUtil {
                                 "  - %s", repoName, repoName, serviceDomain);
                 executeCommand(command);
             } catch (IOException | InterruptedException | ExecutionException e) {
-                log.error("Exception occurred while creating certificate", e);
-                throw new RuntimeException("Failed to create certificate", e);
+                throw new CommonException(ErrorCode.FAILED_CREATE_CERTIFICATE);
             }
         }
     }
@@ -270,8 +264,7 @@ public class ClusterUtil {
             executeCommand(command);
             log.info("NGINX Ingress Controller installed successfully");
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing NGINX Ingress Controller", e);
-            throw new RuntimeException("Failed to install NGINX Ingress Controller", e);
+            throw new CommonException(ErrorCode.FAILED_INSTALL_INGRESS_CONTROLLER);
         }
     }
     private void installClusterIssuer(String userEmail) {
@@ -305,8 +298,7 @@ public class ClusterUtil {
                             "EOF", userEmail);
             executeCommand(command);
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing ClusterIssuer", e);
-            throw new RuntimeException("Failed to install ClusterIssuer", e);
+            throw new CommonException(ErrorCode.FAILED_CREATE_CLUSTER_ISSUER);
         }
     }
 
@@ -394,6 +386,43 @@ public class ClusterUtil {
         }
         return deploymentYaml + "\n---\n" + serviceYaml + (ingressYaml.isEmpty() ? "" : "\n---\n" + ingressYaml);
     }
+    private String generateDeploymentYaml(String repoName, List<EnvironmentVariable> environmentVariables, Integer port) {
+        StringBuilder envVarsBuilder = new StringBuilder();
+        if (environmentVariables != null && !environmentVariables.isEmpty()) {
+            envVarsBuilder.append("        env:\n");
+            for (EnvironmentVariable environmentVariable : environmentVariables) {
+                envVarsBuilder.append(String.format(
+                        "        - name: %s\n" +
+                                "          value: %s\n", environmentVariable.getKey(), environmentVariable.getValue()));
+            }
+        }
+
+        String imageName = String.format("%s.dkr.ecr.%s.amazonaws.com/%s-%s:latest",
+                awsAccountId, awsRegion, ecrRepositoryPrefix, repoName);
+        return String.format(
+                "apiVersion: apps/v1\n" +
+                        "kind: Deployment\n" +
+                        "metadata:\n" +
+                        "  name: %s\n" +
+                        "  namespace: default\n" +
+                        "spec:\n" +
+                        "  replicas: 1\n" +
+                        "  selector:\n" +
+                        "    matchLabels:\n" +
+                        "      app: %s\n" +
+                        "  template:\n" +
+                        "    metadata:\n" +
+                        "      labels:\n" +
+                        "        app: %s\n" +
+                        "    spec:\n" +
+                        "      containers:\n" +
+                        "      - name: %s\n" +
+                        "        image: %s\n" +
+                        "        ports:\n" +
+                        "        - containerPort: %d\n" +
+                        "%s",
+                repoName, repoName, repoName, repoName, imageName, port, envVarsBuilder.toString());
+    }
     private void applyYamlToCluster(String yaml, Cluster cluster) {
         log.info("Applying YAML to cluster: {}", yaml);
         try {
@@ -427,36 +456,33 @@ public class ClusterUtil {
                     request.execute();
                 }
                 else {
-                    throw new RuntimeException("Unsupported resource type: " + resource.getClass().getName());
+                    throw new CommonException(ErrorCode.INVALID_YAML);
                 }
             }
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new CommonException(ErrorCode.FAILED_APPLY_YAML);
         }
     }
 
-    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables, Integer port, String serviceDomain) {
+    public void rolloutDeployment(String repoName, Cluster cluster, List<EnvironmentVariable> environmentVariables, Integer port) {
         ApiClient client = Config.fromToken("https://" +cluster.getDomainUrl(), cluster.getSecretToken(),false);
         Configuration.setDefaultApiClient(client);
         AppsV1Api appsV1Api = new AppsV1Api();
-        CoreV1Api coreV1Api = new CoreV1Api();
-        NetworkingV1Api networkingV1Api = new NetworkingV1Api();
 
         // Deployment 삭제
-        appsV1Api.deleteNamespacedDeployment(repoName, "default");
-        log.info("Deleted existing deployment: {}", repoName);
-        coreV1Api.deleteNamespacedService(repoName + "-service", "default");
-        log.info("Deleted existing service: {}", repoName);
-        if(!serviceDomain.equals("none")) {
-            networkingV1Api.deleteNamespacedIngress(repoName + "-ingress", "default");
-            log.info("Deleted existing ingress: {}", repoName);
+        AppsV1Api.APIdeleteNamespacedDeploymentRequest request = appsV1Api.deleteNamespacedDeployment(repoName, "default");
+        try{
+            request.execute();
+            log.info("Deleted existing deployment: {}", repoName);
+        } catch
+        (Exception e) {
+            log.error("Failed to delete deployment: {}", repoName);
         }
 
         // 새로운 yaml그룹 생성
-        String newYaml = generateYaml(repoName, environmentVariables, port, serviceDomain);
+        String newYaml = generateDeploymentYaml(repoName, environmentVariables, port);
         applyYamlToCluster(newYaml, cluster);
         log.info("Applied new deployment: {}", repoName);
-
     }
 
     private void createEcrRepositoryIfNotExists(String repoName) throws IOException, InterruptedException, ExecutionException {
@@ -486,8 +512,7 @@ public class ClusterUtil {
 
             log.info("Metrics Server installed and configured successfully");
         } catch (IOException | InterruptedException | ExecutionException e) {
-            log.error("Exception occurred while installing and configuring metrics-server", e);
-            throw new RuntimeException("Failed to install and configure metrics-server", e);
+            throw new CommonException(ErrorCode.FAILED_INSTALL_METRICS_SERVER);
         }
     }
 

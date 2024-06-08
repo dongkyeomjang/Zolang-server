@@ -1,7 +1,9 @@
 package com.kcs.zolang.dto.response.cluster;
 
 import io.swagger.v3.oas.annotations.media.Schema;
+import lombok.Builder;
 
+@Builder
 public record UserUsageDto(
         //cpu
         @Schema(description = "모든 클러스터 전체 CPU 사용", example = "1.5")
