@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.annotation.Transactional;
 
 @Slf4j
 @Component
@@ -110,6 +111,7 @@ public class MonitoringUtil {
     }
 
     //2분마다
+    @Transactional(readOnly = true)
     @Scheduled(cron = "0 */2 * * * *")
     public void saveResourceUsage() {
         List<User> users = userRepository.findAll();
@@ -119,6 +121,11 @@ public class MonitoringUtil {
         for (User user : users) {
             List<Cluster> clusters = clusterRepository.findByUserId(user.getId());
             for (Cluster cluster : clusters) {
+                if (redisTemplate.opsForValue()
+                    .setIfAbsent("cluster" + cluster.getId() + "-monitoring-lock-key", 1,
+                        Duration.ofMinutes(1)) == false) {
+                    continue;
+                }
                 Map<String, Double> namespaceCpuUsage = new HashMap<>();
                 Map<String, Long> namespaceMemoryUsage = new HashMap<>();
                 double totalCpuUsage = 0;
