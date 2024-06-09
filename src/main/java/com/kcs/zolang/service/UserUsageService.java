@@ -130,12 +130,16 @@ public class UserUsageService {
     }
 
     //usage 데이터 저장
+    @Transactional
     @Scheduled(cron = "0 0 * * * *") // 1시간마다 데이터 저장
     public void saveHourlyUserUsage() {
+        LocalDateTime now = LocalDateTime.now().truncatedTo(ChronoUnit.HOURS);
+        if (usageRepository.existsByCreatedAtBetween(now, now.plusMinutes(50))) {
+            return;
+        }
         List<User> users = userRepository.findAll();
         for (User user : users) {
             UserUsageDto userUsageDto = getUserUsage(user.getId());
-
             Usage usage = Usage.builder()
                 .user(user)
                 .cpuUsage(userUsageDto.cpuUsage())
@@ -173,6 +177,9 @@ public class UserUsageService {
     @Scheduled(cron = "0 0 0 * * *") // 정각마다 하루 전 cost 저장
     public void saveDailyBill() {
         LocalDateTime now = LocalDateTime.now();
+        if (billRepository.existsByDate(String.valueOf(LocalDate.now().minusDays(1)))) {
+            return;
+        }
         LocalDateTime startOfDay = now.minusDays(1).truncatedTo(ChronoUnit.DAYS);
         LocalDateTime endOfDay = startOfDay.plusDays(1).minusNanos(1);
 
